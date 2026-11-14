@@ -32,7 +32,7 @@ var Bundle=Function.extend(Function, function () {
 	};
 
 	Bundle.CustomAgent=function (path) {
-		return `https://esm.sh/gh/kenkin360/CustomAgent/${path}?raw`;
+		return `https://esm.sh/gh/kenkin360/CustomAgent@2faa898743b175ff4b261e7a523655325cce9b92/${path}?raw`;
 	};
 
 	Bundle.Config=[
