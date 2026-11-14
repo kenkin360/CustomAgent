@@ -11,6 +11,6 @@ Flow host contains exactly four files: `App.tsx`, `Bundle.js`, `Resource.js`, an
 - `ConversationController.js` — agent dialogue, local actions, and final response
 - `CustomAgent.js` — React component and interface events
 
-Every remotely loaded script defines its expected global name and has no top-level `import` or `export`. `UpscaleCode.js` contains an `export default` only inside the JavaScript source string passed to `installCode` at runtime. `Bundle.js` is loaded in Flow host as an ES module and exports `Bundle` for `App.tsx`.
+Every remotely loaded file is a classic script with a top-level `var` whose name exactly matches its `Bundle.Config` key. `Resource.Module` reads that name from `globalThis`; classic scripts expose top-level `var` there without an explicit assignment. Remote scripts have no top-level `import` or `export`. `UpscaleCode.js` contains `export default` only inside the JavaScript source string passed to `installCode` at runtime. The host's `Bundle.js` and `Resource.js` remain ES modules because `App.tsx` imports them.
 
 Sending a message displays it before the rollback intent check. The model receives up to 20 preceding messages plus the current message separately. Image generation starts only after the user chooses Generate. The UI supports multiple input lines with Shift+Enter.
