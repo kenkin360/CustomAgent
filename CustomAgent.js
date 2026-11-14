@@ -121,6 +121,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 			case 'info': $this.Node('dialog').style.display='flex'; break;
 			case 'close-info': $this.Node('dialog').style.display='none'; break;
 			case 'copy-prompt': navigator.clipboard.writeText(this.m_state.generationPrompt||''); break;
+			case 'copy-message-prompt': {
+				let message=this.m_state.messages.find((item)=>item.id===node.dataset.messageId);
+				if (message?.suggestedPrompt) navigator.clipboard.writeText(message.suggestedPrompt);
+				break;
+			}
 		}
 	};
 
@@ -144,6 +149,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (input.value!==state.inputText) input.value=state.inputText;
 		this.Node('pending').style.display=state.accumulatedChanges.length?'block':'none';
 		this.Node('pending-count').textContent=`${state.accumulatedChanges.length} confirmed changes`;
+		this.Node('pending-list').textContent=state.accumulatedChanges.map((item, index)=>`${index+1}. ${item}`).join('\n');
+		this.Node('pending-list').style.whiteSpace='pre-wrap';
+		this.Node('pending-prompt').textContent=state.generationPrompt||'';
 		for (let button of this.Node('ratios').querySelectorAll('[data-ratio]')) button.classList.toggle('ca-selected', button.dataset.ratio===state.selectedRatio);
 		if (state.messages!==this.m_lastMessages) {
 			let list=this.Node('message-list');
@@ -167,6 +175,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 					prompt.className='ca-prompt';
 					prompt.textContent='Suggested prompt: '+message.suggestedPrompt;
 					item.appendChild(prompt);
+					let copy=document.createElement('button');
+					copy.dataset.action='copy-message-prompt';
+					copy.dataset.messageId=message.id;
+					copy.textContent='Copy prompt';
+					item.appendChild(copy);
 				}
 				return item;
 			}));
