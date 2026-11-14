@@ -1,5 +1,3 @@
-import './Function.extend.js';
-
 var AppUI=Function.extend(Object, function () {
 	var _=this(AppUI);
 	AppUI=_[AppUI];
@@ -170,4 +168,4 @@ var AppUI=Function.extend(Object, function () {
 	_['private'].m_handler=null;
 });
 
-export { AppUI };
+globalThis.AppUI=AppUI;
