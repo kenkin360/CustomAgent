@@ -1,5 +1,3 @@
-import './Function.extend.js';
-
 var DrawingActions=Function.extend(Object, function () {
 	var _=this(DrawingActions);
 	DrawingActions=_[DrawingActions];
@@ -60,4 +58,4 @@ var DrawingActions=Function.extend(Object, function () {
 	};
 });
 
-export { DrawingActions };
+globalThis.DrawingActions=DrawingActions;
