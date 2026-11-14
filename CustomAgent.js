@@ -23,7 +23,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			, isConsulting: false
 			, isGenerating: false
 		};
-		$this.m_runtime=new RuntimeActions();
+		$this.m_runtime=new RuntimeActions(props.SourceFiles);
 		$this.m_conversation=new ConversationController();
 		$this.m_images=new ImageService(Flow);
 		$this.m_ui=null;
@@ -308,4 +308,3 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['private'].m_input=null;
 	_['private'].m_key=null;
 });
-globalThis.CustomAgent=CustomAgent;
