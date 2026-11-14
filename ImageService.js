@@ -84,4 +84,3 @@ var ImageService=Function.extend(Object, function () {
 	_['private'].m_flow=null;
 });
 
-globalThis.ImageService=ImageService;
