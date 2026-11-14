@@ -1,5 +1,3 @@
-import './Function.extend.js';
-
 var ImageService=Function.extend(Object, function () {
 	var _=this(ImageService);
 	ImageService=_[ImageService];
@@ -86,4 +84,4 @@ var ImageService=Function.extend(Object, function () {
 	_['private'].m_flow=null;
 });
 
-export { ImageService };
+globalThis.ImageService=ImageService;
