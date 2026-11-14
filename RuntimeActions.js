@@ -2,13 +2,14 @@ var RuntimeActions=Function.extend(Object, function () {
 	var _=this(RuntimeActions);
 	RuntimeActions=_[RuntimeActions];
 
-	function RuntimeActions() {
+	function RuntimeActions(sources) {
 		_['base'].apply(this, arguments);
 		let $this=_(this);
 		$this.m_versions=[];
 		$this.m_ui=null;
 		$this.m_installing=false;
 		$this.m_startup=null;
+		$this.m_sources=sources||[];
 	}
 
 	_['public'].GetRuntime=function () {
@@ -191,7 +192,7 @@ var RuntimeActions=Function.extend(Object, function () {
 		let files={};
 		try { files=_(this).SourceFiles(url); }
 		catch (error) { console.warn('Bundled host source unavailable:', error); }
-		let remote=(globalThis.Bundle?.Config||[]).map(([name, address])=>({name, address, file: address.split(/[?#]/)[0].split('/').pop()}));
+		let remote=_(this).m_sources.map(([name, address])=>({name, address, file: address.split(/[?#]/)[0].split('/').pop()}));
 		if (typeof args.file!=='string') {
 			return {message: `Available bundled files: ${Object.keys(files).join(', ')||'(none)'}. Loaded remote files: ${remote.map((entry)=>entry.file).join(', ')||'(none)'}.`};
 		}
@@ -258,6 +259,5 @@ var RuntimeActions=Function.extend(Object, function () {
 	_['private'].m_ui=null;
 	_['private'].m_installing=false;
 	_['private'].m_startup=null;
+	_['private'].m_sources=null;
 });
-
-globalThis.RuntimeActions=RuntimeActions;
