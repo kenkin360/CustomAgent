@@ -58,4 +58,3 @@ var DrawingActions=Function.extend(Object, function () {
 	};
 });
 
-globalThis.DrawingActions=DrawingActions;
