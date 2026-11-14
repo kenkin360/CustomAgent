@@ -107,4 +107,3 @@ export default function(runtime) {
 }
 `;
 
-globalThis.UPSCALE_INSTALL_CODE=UPSCALE_INSTALL_CODE;
