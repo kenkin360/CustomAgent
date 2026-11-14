@@ -168,4 +168,3 @@ var AppUI=Function.extend(Object, function () {
 	_['private'].m_handler=null;
 });
 
-globalThis.AppUI=AppUI;
