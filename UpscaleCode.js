@@ -1,35 +1,46 @@
-var UPSCALE_INSTALL_CODE= String.raw`
+var UpscaleCode=Function.extend(Object, function () {
+	var _=this(UpscaleCode);
+	UpscaleCode=_[UpscaleCode];
+
+	function UpscaleCode() {
+		_['base'].apply(this, arguments);
+	}
+
+	UpscaleCode.Code=String.raw`
 export default function(runtime) {
-	const module=import('https://esm.sh/@websr/websr@0.1.1?standalone').then(
+	var Upscale=Function.extend(Object, function () {
+		var _=this(Upscale);
+		Upscale=_[Upscale];
+
+		function Upscale() {
+			_['base'].apply(this, arguments);
+			let $this=_(this);
+			$this.m_module=import('https://esm.sh/@websr/websr@0.1.1?standalone').then(
 		value=>({Type: value.default})
 		, error=>({Error: error})
 	);
-	const weightsUrl='https://esm.sh/gh/sb2702/websr@v0.1.0/weights/realesrgan/x4v3.bin?raw';
-	let weights=null;
+			$this.m_weights=null;
+		}
 
-	async function GetWeights() {
-		if (!weights) {
-			weights=fetch(weightsUrl).then(async function(response) {
+		_['private'].GetWeights=async function () {
+			let $this=_(this);
+			if (!$this.m_weights) {
+				$this.m_weights=fetch('https://esm.sh/gh/sb2702/websr@v0.1.0/weights/realesrgan/x4v3.bin?raw').then(async function(response) {
 				if (!response.ok) {
 					throw new Error('Failed to load weights: '+response.status);
 				}
 				return response.arrayBuffer();
-			});
-		}
-		try {
-			return await weights;
-		}
-		catch (error) {
-			weights=null;
-			throw error;
-		}
-	}
+				});
+			}
+			try { return await $this.m_weights; }
+			catch (error) { $this.m_weights=null; throw error; }
+		};
 
-	runtime.upscaleImage=async function(args, {image}) {
+		_['public'].Run=async function(args, {image}) {
 		if (!image) {
 			throw new Error('Load an image first.');
 		}
-		const loaded=await module;
+		const loaded=await _(this).m_module;
 		if (loaded.Error) {
 			throw loaded.Error;
 		}
@@ -37,7 +48,7 @@ export default function(runtime) {
 		const source=new Image();
 		source.src='data:'+image.mimeType+';base64,'+image.base64;
 		await source.decode();
-		const buffer=await GetWeights();
+		const buffer=await _(this).GetWeights();
 		const canvas=document.createElement('canvas');
 		let upscaler;
 		let webgl=false;
@@ -103,7 +114,13 @@ export default function(runtime) {
 		finally {
 			upscaler.destroy();
 		}
-	};
+		};
+		_['private'].m_module=null;
+		_['private'].m_weights=null;
+	});
+	let upscale=new Upscale();
+	runtime.upscaleImage=upscale.Run.bind(upscale);
 }
 `;
+});
 

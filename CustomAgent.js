@@ -2,191 +2,15 @@ var CustomAgent=Function.extend(React.Component, function () {
 	var _=this(CustomAgent);
 	CustomAgent=_[CustomAgent];
 
-	var AppUI=Function.extend(Object, function () {
-		var _=this(AppUI);
-		AppUI=_[AppUI];
-	
-		function AppUI(context) {
-			_['base'].apply(this, arguments);
-			let $this=_(this);
-			$this.m_context=context;
-			$this.m_mounted=new Map();
-			$this.m_listeners=new Set();
-			$this.m_handler=null;
-		}
-	
-		_['public'].Slots=['header', 'canvas', 'chat', 'overlay'];
-	
-		_['public'].Mount=function (name, element, slot='header') {
-			let $this=_(this);
-			let target=$this.m_context.Slots[slot];
-			if (!name||!(element instanceof HTMLElement)||!this.Slots.includes(slot)||!target) {
-				throw new Error('Provide an extension name, an HTML element, and an available UI slot.');
-			}
-			this.Unmount(name);
-			$this.m_mounted.set(name, {Element: element, Slot: slot});
-			target.appendChild(element);
-		};
-	
-		_['public'].Unmount=function (name) {
-			let $this=_(this);
-			$this.m_mounted.get(name)?.Element.remove();
-			$this.m_mounted.delete(name);
-		};
-	
-		_['public'].Mounted=function () {
-			return [..._(this).m_mounted.keys()];
-		};
-	
-		_['public'].CaptureVersion=function () {
-			let $this=_(this);
-			return {
-				Mounted: new Map($this.m_mounted)
-				, Listeners: new Set($this.m_listeners)
-				, Handler: $this.m_handler
-			};
-		};
-	
-		_['public'].RestoreVersion=function (version) {
-			let $this=_(this);
-			for (let name of this.Mounted()) this.Unmount(name);
-			for (let [name, entry] of version.Mounted) this.Mount(name, entry.Element, entry.Slot);
-			$this.m_listeners=new Set(version.Listeners);
-			$this.m_handler=version.Handler;
-		};
-	
-		_['public'].GetConversationHandler=function () {
-			return _(this).m_handler;
-		};
-	
-		_['public'].SetConversationHandler=function (handler) {
-			if (handler!==null&&typeof handler!=='function') {
-				throw new Error('Conversation handler must be a function or null.');
-			}
-			let $this=_(this);
-			let previous=$this.m_handler;
-			$this.m_handler=handler;
-			return ()=>{
-				if ($this.m_handler===handler) $this.m_handler=previous;
-			};
-		};
-	
-		_['public'].HasConversationHandler=function () {
-			return _(this).m_handler!==null;
-		};
-	
-		_['public'].GetState=function () {
-			let state=_(this).m_context.GetState();
-			return {
-				...state
-				, history: [...state.history]
-				, messages: [...state.messages]
-				, accumulatedChanges: [...state.accumulatedChanges]
-			};
-		};
-	
-		_['public'].Subscribe=function (listener) {
-			let $this=_(this);
-			$this.m_listeners.add(listener);
-			listener(this.GetState());
-			return ()=>$this.m_listeners.delete(listener);
-		};
-	
-		_['public'].Notify=function () {
-			for (let listener of _(this).m_listeners) {
-				try { listener(this.GetState()); }
-				catch (error) { console.error('App UI subscriber failed:', error); }
-			}
-		};
-	
-		_['public'].RunAction=function (action) {
-			return _(this).m_context.RunAction(action);
-		};
-	
-		_['public'].GenerateText=function (prompt, options) {
-			return _(this).m_context.GenerateText(prompt, options);
-		};
-	
-		_['public'].UpdateConversation=function (patch) {
-			_(this).m_context.UpdateConversation(patch);
-		};
-	
-		_['public'].ResetConversation=function () {
-			let $this=_(this);
-			if ($this.m_context.GetState().isGenerating) {
-				throw new Error('Wait for image generation to finish before resetting the conversation.');
-			}
-			$this.m_context.UpdateConversation({messages: [], accumulatedChanges: [], generationPrompt: '', inputText: ''});
-			$this.m_context.ResetCopied();
-		};
-	
-		_['public'].SetInput=function (value) {
-			this.UpdateConversation({inputText: value});
-		};
-	
-		_['public'].SetRatio=function (value) {
-			if (!['1:1', '16:9', '9:16', '4:3', '3:4'].includes(value)) {
-				throw new Error('Unsupported aspect ratio.');
-			}
-			this.UpdateConversation({selectedRatio: value});
-		};
-	
-		_['public'].SelectVersion=function (id) {
-			_(this).m_context.SelectVersion(id);
-		};
-	
-		_['public'].SendMessage=function (text) {
-			return _(this).m_context.SendMessage(text);
-		};
-	
-		_['public'].Generate=function (prompt) {
-			return _(this).m_context.Generate(prompt);
-		};
-	
-		_['public'].PickMedia=function () {
-			return _(this).m_context.PickMedia();
-		};
-	
-		_['public'].CaptureCamera=function () {
-			return _(this).m_context.CaptureCamera();
-		};
-	
-		_['public'].Download=function () {
-			return _(this).m_context.Download();
-		};
-	
-		_['public'].RollbackCode=function () {
-			return _(this).m_context.RollbackCode();
-		};
-	
-		_['public'].Destroy=function () {
-			let $this=_(this);
-			for (let name of this.Mounted()) this.Unmount(name);
-			$this.m_listeners.clear();
-			$this.m_handler=null;
-		};
-	
-		_['private'].m_context=null;
-		_['private'].m_mounted=null;
-		_['private'].m_listeners=null;
-		_['private'].m_handler=null;
-	});
-
-
 	function CustomAgent(props) {
-		_['base'].apply(this, arguments);
+		_['base'].apply(this, arguments)(function () {
 		let $this=_(this);
-		$this.m_component=this;
+		$this.m_owner=this;
 		$this.m_root=React.createRef();
 		$this.m_state={
 			activeImage: null
 			, history: []
-			, messages: [{
-				id: 'welcome'
-				, sender: 'agent'
-				, text: '您好！可以要求本地畫矩形、查閱 App 程式碼、載入新功能，或討論影像修改。只有按下生成按鈕才會生成新影像。'
-				, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-			}]
+			, messages: []
 			, inputText: ''
 			, selectedRatio: '16:9'
 			, accumulatedChanges: []
@@ -194,12 +18,20 @@ var CustomAgent=Function.extend(React.Component, function () {
 			, isConsulting: false
 			, isGenerating: false
 		};
-		$this.m_runtime=new RuntimeActions(props.SourceFiles);
-		$this.m_conversation=new ConversationController();
+		$this.m_versions=[];
+		$this.m_mounted=new Map();
+		$this.m_listeners=new Set();
+		$this.m_handler=null;
+		$this.m_messageListener=null;
+		$this.m_eventListener=null;
+		$this.m_installing=false;
+		$this.m_startup=null;
+		$this.m_sources=props.SourceFiles||[];
+		$this.m_assistant=null;
 		$this.m_images=new ImageService(Flow);
-		$this.m_ui=null;
 		$this.m_lastMessages=null;
 		$this.m_lastHistory=null;
+		});
 	}
 
 	_['private'].Node=function (role) {
@@ -209,7 +41,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['private'].SetValues=function (patch) {
 		Object.assign(this.m_state, patch);
 		this.Update();
-		this.m_ui?.Notify();
+		this.Notify();
 	};
 
 	_['private'].AddMessage=function (sender, text, fields={}) {
@@ -223,38 +55,351 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}]});
 	};
 
-	_['private'].MakeUI=function () {
-		let $this=this;
-		let root=this.m_root.current;
-		return new AppUI({
-			Slots: Object.fromEntries(['header','canvas','chat','overlay'].map((name)=>[name,root.querySelector(`[data-slot="${name}"]`)]))
-			, GetState: ()=>$this.m_state
-			, ResetCopied: ()=>{}
-			, RollbackCode: ()=>$this.m_runtime.Rollback()
-			, GenerateText: (prompt, options)=>Flow.generate.text(prompt, options)
-			, SendMessage: (text)=>$this.m_component.Send(text)
-			, Generate: (prompt)=>$this.m_component.Generate(prompt)
-			, PickMedia: ()=>$this.m_component.SelectMedia()
-			, CaptureCamera: ()=>$this.m_component.CaptureCamera()
-			, Download: ()=>$this.m_component.Download()
-			, SelectVersion: (id)=>{
-				let image=$this.m_state.history.find((item)=>item.id===id);
-				if (!image) throw new Error('Image version not found: '+id);
-				$this.SetValues({activeImage: image});
+	_['public'].Slots=['header', 'canvas', 'chat', 'overlay'];
+
+	_['public'].GetState=function () {
+		let state=_(this).m_state;
+		return {...state, history: [...state.history], messages: [...state.messages], accumulatedChanges: [...state.accumulatedChanges]};
+	};
+
+	_['public'].Reply=function (text, fields={}) {
+		_(this).AddMessage('agent', text, fields);
+	};
+
+	_['public'].ReportError=function (error) {
+		_(this).AddMessage('system', error.message||String(error));
+	};
+
+	_['public'].NotifyAssistant=async function (event, details, image) {
+		try { await _(this).m_eventListener(event, details, image); }
+		catch (error) { this.ReportError(error); }
+	};
+
+	_['public'].SubscribeMessage=function (listener) {
+		let $this=_(this);
+		$this.m_messageListener=listener;
+		return ()=>{ if ($this.m_messageListener===listener) $this.m_messageListener=null; };
+	};
+
+	_['public'].SubscribeEvent=function (listener) {
+		let $this=_(this);
+		$this.m_eventListener=listener;
+		return ()=>{ if ($this.m_eventListener===listener) $this.m_eventListener=null; };
+	};
+
+	_['public'].Mount=function (name, element, slot='header') {
+		let $this=_(this);
+		let target=$this.m_root.current?.querySelector(`[data-slot="${slot}"]`);
+		if (!name||!(element instanceof HTMLElement)||!this.Slots.includes(slot)||!target) throw new Error('Provide an extension name, an HTML element, and an available UI slot.');
+		this.Unmount(name);
+		$this.m_mounted.set(name, {Element: element, Slot: slot});
+		target.appendChild(element);
+	};
+
+	_['public'].Unmount=function (name) {
+		let $this=_(this);
+		$this.m_mounted.get(name)?.Element.remove();
+		$this.m_mounted.delete(name);
+	};
+
+	_['public'].Mounted=function () { return [..._(this).m_mounted.keys()]; };
+
+	_['public'].CaptureVersion=function () {
+		let $this=_(this);
+		return {Mounted: new Map($this.m_mounted), Listeners: new Set($this.m_listeners), Handler: $this.m_handler};
+	};
+
+	_['public'].RestoreVersion=function (version) {
+		let $this=_(this);
+		for (let name of this.Mounted()) this.Unmount(name);
+		for (let [name, entry] of version.Mounted) this.Mount(name, entry.Element, entry.Slot);
+		$this.m_listeners=new Set(version.Listeners);
+		$this.m_handler=version.Handler;
+	};
+
+	_['public'].Subscribe=function (listener) {
+		let $this=_(this);
+		$this.m_listeners.add(listener);
+		listener(this.GetState());
+		return ()=>$this.m_listeners.delete(listener);
+	};
+
+	_['public'].Notify=function () {
+		for (let listener of _(this).m_listeners) {
+			try { listener(this.GetState()); }
+			catch (error) { console.error('App subscriber failed:', error); }
+		}
+	};
+
+	_['public'].GetConversationHandler=function () { return _(this).m_handler; };
+
+	_['public'].SetConversationHandler=function (handler) {
+		if (handler!==null&&typeof handler!=='function') throw new Error('Conversation handler must be a function or null.');
+		let $this=_(this);
+		let previous=$this.m_handler;
+		$this.m_handler=handler;
+		return ()=>{ if ($this.m_handler===handler) $this.m_handler=previous; };
+	};
+
+	_['public'].HasConversationHandler=function () { return _(this).m_handler!==null; };
+	_['public'].GenerateText=function (prompt, options) { return _(this).m_assistant.GenerateText(prompt, options); };
+	_['public'].UpdateConversation=function (patch) { _(this).SetValues(patch); };
+	_['public'].ResetConversation=function () {
+		let $this=_(this);
+		if ($this.m_state.isGenerating) throw new Error('Wait for image generation to finish before resetting the conversation.');
+		$this.SetValues({messages: [], accumulatedChanges: [], generationPrompt: '', inputText: ''});
+	};
+	_['public'].SetInput=function (value) { this.UpdateConversation({inputText: value}); };
+	_['public'].SetRatio=function (value) {
+		if (!['1:1', '16:9', '9:16', '4:3', '3:4'].includes(value)) throw new Error('Unsupported aspect ratio.');
+		this.UpdateConversation({selectedRatio: value});
+	};
+	_['public'].SelectVersion=function (id) {
+		let $this=_(this);
+		let image=$this.m_state.history.find((item)=>item.id===id);
+		if (!image) throw new Error('Image version not found: '+id);
+		$this.SetValues({activeImage: image});
+	};
+	_['public'].SendMessage=function (text) { return this.Send(text); };
+	_['public'].PickMedia=function () { return this.SelectMedia(); };
+	_['public'].RollbackCode=function () { return this.Rollback(); };
+
+	_['public'].RunAction=async function (action) {
+		let $this=_(this);
+		let image=$this.m_state.activeImage;
+		let result=await $this.ExecuteAction(action, image, this.props.HostSourceUrl);
+		if (result.image) $this.SetValues({activeImage: result.image, history: [result.image, ...$this.m_state.history]});
+		return result;
+	};
+
+	_['public'].InspectRuntime=function (args={}) {
+		return _(this).ExecuteAction({name: 'inspectRuntime', arguments: args}, _(this).m_state.activeImage, this.props.HostSourceUrl);
+	};
+
+	_['public'].GetRuntime=function () {
+		let runtime=globalThis.AppRuntime||=Object.create(null);
+		runtime.Modules||=Object.create(null);
+		let owner=_(this).m_owner;
+		if (runtime.UI!==owner) runtime.LoadModule=(args)=>owner.LoadModule(args);
+		runtime.UI=owner;
+		return runtime;
+	};
+
+	_['public'].GetNames=function () {
+		return Object.keys(this.GetRuntime()).filter((name)=>typeof this.GetRuntime()[name]==='function');
+	};
+
+	_['private'].Capture=function () {
+		let runtime=this.GetRuntime();
+		let ui=this.m_owner;
+		return {
+			Runtime: Object.getOwnPropertyDescriptors(runtime)
+			, Modules: Object.getOwnPropertyDescriptors(runtime.Modules)
+			, ModulesTarget: runtime.Modules
+			, UI: ui?.CaptureVersion()
+			, UIProperties: ui?Object.getOwnPropertyDescriptors(ui):null
+		};
+	};
+
+	_['private'].RestoreProperties=function (target, properties) {
+		for (let key of Reflect.ownKeys(target)) {
+			if (!Object.prototype.hasOwnProperty.call(properties, key)&&!Reflect.deleteProperty(target, key)) {
+				throw new Error('Cannot restore non-configurable runtime member: '+String(key));
 			}
-			, RunAction: async (action)=>{
-				let result=await $this.m_runtime.Execute(action, $this.m_state.activeImage, $this.m_component.props.HostSourceUrl);
-				if (result.image) $this.SetValues({activeImage: result.image, history: [result.image, ...$this.m_state.history]});
-				return result;
+		}
+		Object.defineProperties(target, properties);
+	};
+
+	_['private'].Restore=function (snapshot) {
+		let runtime=this.GetRuntime();
+		this.RestoreProperties(runtime, snapshot.Runtime);
+		this.RestoreProperties(snapshot.ModulesTarget, snapshot.Modules);
+		runtime.UI=this.m_owner;
+		if (snapshot.UIProperties) this.RestoreProperties(this.m_owner, snapshot.UIProperties);
+		if (snapshot.UI) this.m_owner.RestoreVersion(snapshot.UI);
+	};
+
+	_['public'].HasVersion=function () {
+		return _(this).m_versions.length>0;
+	};
+
+	_['public'].Rollback=function () {
+		let $this=_(this);
+		let snapshot=$this.m_versions.at(-1);
+		if (!snapshot) throw new Error('No previous runtime code version is available.');
+		$this.Restore(snapshot);
+		$this.m_versions.pop();
+		return `Restored the previous runtime code version. ${$this.m_versions.length} earlier versions remain.`;
+	};
+
+	_['public'].InstallCode=async function (args, track=true) {
+		if (typeof args?.code!=='string'||!args.code.trim()||args.code.length>50000) {
+			throw new Error('Provide JavaScript module code of at most 50000 characters.');
+		}
+		let $this=_(this);
+		if ($this.m_installing) throw new Error('Another runtime installation is in progress.');
+		let runtime=this.GetRuntime();
+		let snapshot=$this.Capture();
+		let before={...runtime};
+		$this.m_installing=true;
+		try {
+			let url=`data:text/javascript;charset=utf-8,${encodeURIComponent(args.code)}#${Date.now()}_${Math.random()}`;
+			let module=await import(url);
+			if (typeof module.default==='function') await module.default(runtime);
+			let names=this.GetNames();
+			let changed=names.filter((name)=>runtime[name]!==before[name]);
+			if (track) $this.m_versions.push(snapshot);
+			return {message: `Code loaded in the current App runtime. Registered functions: ${changed.join(', ')||'(none)'}. Available functions: ${names.join(', ')||'(none)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${$this.m_versions.length}.`};
+		}
+		catch (error) {
+			try { $this.Restore(snapshot); }
+			catch (restoreError) { throw new Error(`Installation failed: ${String(error)}. Recovery failed: ${String(restoreError)}`); }
+			throw error;
+		}
+		finally {
+			$this.m_installing=false;
+		}
+	};
+
+	_['public'].Initialize=function () {
+		let $this=_(this);
+		if (!$this.m_startup) {
+			$this.m_startup=(async ()=>{
+				await this.InstallCode({code: DrawingCode.Code}, false);
+				await this.InstallCode({code: UpscaleCode.Code}, false);
+			})().catch((error)=>{
+				$this.m_startup=null;
+				throw error;
+			});
+		}
+		return $this.m_startup;
+	};
+
+	_['public'].LoadModule=async function (args) {
+		if (typeof args?.specifier!=='string'||typeof args?.name!=='string'||!/^[A-Za-z_$][\w$]*$/.test(args.name)) {
+			throw new Error('Provide an esm.sh specifier and a module name.');
+		}
+		let url=new URL(args.specifier.startsWith('https://')?args.specifier:`https://esm.sh/${args.specifier.replace(/^\/+/, '')}`);
+		if (url.origin!=='https://esm.sh') throw new Error('Only esm.sh module URLs are supported.');
+		let modules=this.GetRuntime().Modules;
+		if (modules[args.name]) return {message: `${args.name} is already loaded from esm.sh.`};
+		if (url.searchParams.has('raw')) {
+			let timeout=Number.isFinite(args.timeoutMs)?Math.max(1000, Math.min(60000, args.timeoutMs)):30000;
+			await new Promise((resolve, reject)=>{
+				let script=document.createElement('script');
+				let timer=setTimeout(()=>{script.remove();reject(new Error('Timed out loading '+url.href));}, timeout);
+				script.onload=()=>{clearTimeout(timer);resolve();};
+				script.onerror=()=>{clearTimeout(timer);script.remove();reject(new Error('Failed to load '+url.href));};
+				script.src=url.href;
+				(document.head||document.body||document.documentElement).appendChild(script);
+			});
+			let value=args.globalName?globalThis[args.globalName]:true;
+			if (args.globalName) {
+				let deadline=Date.now()+timeout;
+				while (Date.now()<deadline) {
+					value=globalThis[args.globalName];
+					if (value&&typeof value.then==='function') value=await value;
+					if (value&&(!args.readyMember||value[args.readyMember])) break;
+					await new Promise((resolve)=>setTimeout(resolve, 50));
+				}
+				if (!value||args.readyMember&&!value[args.readyMember]) throw new Error('Timed out waiting for '+args.globalName);
 			}
-			, UpdateConversation: (patch)=>$this.SetValues(patch)
+			modules[args.name]=value;
+			return {message: `${args.name} loaded as a raw script from ${url.href}.`};
+		}
+		let value=await import(url.href);
+		modules[args.name]=value;
+		return {message: `${args.name} loaded as an ES module from ${url.href}; exports: ${Object.keys(value).slice(0, 40).join(', ')||'(none)'}.`};
+	};
+
+	_['private'].SourceFiles=function (url) {
+		let prefix='data:text/javascript;base64,';
+		if (!url?.startsWith(prefix)) throw new Error('The bundled source is unavailable from import.meta.url.');
+		let bytes=Uint8Array.from(atob(url.slice(prefix.length)), (char)=>char.charCodeAt(0));
+		let source=new TextDecoder().decode(bytes);
+		let markers=[...source.matchAll(/^\/\/ virtual:([^\r\n]+)\r?\n/gm)];
+		if (!markers.length) return {bundle: source};
+		let files=Object.create(null);
+		markers.forEach((marker, index)=>{
+			let start=marker.index+marker[0].length;
+			let end=index+1<markers.length?markers[index+1].index:source.length;
+			let name=marker[1].trim();
+			files[name]=(files[name]||'')+source.slice(start, end).replace(/^\/\/ virtual-export:default [^\r\n]+\r?\n/, '');
 		});
+		return files;
+	};
+
+	_['public'].ReadSource=async function (args, url) {
+		url||=_(this).m_owner.props.HostSourceUrl;
+		let files={};
+		try { files=_(this).SourceFiles(url); }
+		catch (error) { console.warn('Bundled host source unavailable:', error); }
+		let remote=_(this).m_sources.map(([name, address])=>({name, address, file: address.split(/[?#]/)[0].split('/').pop()}));
+		if (typeof args.file!=='string') {
+			return {message: `Available bundled files: ${Object.keys(files).join(', ')||'(none)'}. Loaded remote files: ${remote.map((entry)=>entry.file).join(', ')||'(none)'}.`};
+		}
+		let source=files[args.file];
+		if (source===undefined) {
+			let entry=remote.find((item)=>item.file===args.file||item.name===args.file);
+			if (!entry) throw new Error('Source file not found: '+args.file);
+			let response=await fetch(entry.address);
+			if (!response.ok) throw new Error(`Failed to read ${args.file}: HTTP ${response.status}`);
+			source=await response.text();
+		}
+		let query=typeof args.query==='string'?args.query:'';
+		let match=query?source.toLowerCase().indexOf(query.toLowerCase()):-1;
+		if (query&&match<0) return {message: `${args.file}: no match for ${JSON.stringify(query)}.`};
+		let limit=Number.isInteger(args.limit)?Math.max(1, Math.min(12000, args.limit)):8000;
+		let offset=match>=0?Math.max(0, match-500):Number.isInteger(args.offset)?Math.max(0, Math.min(source.length, args.offset)):0;
+		return {message: `${args.file} (${offset}-${Math.min(source.length,offset+limit)} of ${source.length} characters):\n${source.slice(offset,offset+limit)}`};
+	};
+
+	_['private'].ExecuteAction=async function (action, image, sourceUrl) {
+		if (!action?.arguments||typeof action.arguments!=='object'||Array.isArray(action.arguments)) throw new Error('Action arguments must be an object.');
+		let args=action.arguments;
+		switch (action.name) {
+			case 'readAppSource': return this.ReadSource(args, sourceUrl);
+			case 'inspectRuntime': {
+				let runtime=this.GetRuntime();
+				if (typeof args.name==='string') {
+					if (typeof runtime[args.name]!=='function') throw new Error('Runtime function not found: '+args.name);
+					return {message: `${args.name}: ${String(runtime[args.name]).slice(0,12000)}`};
+				}
+				return {message: `AppRuntime functions: ${this.GetNames().join(', ')||'(none)'}. Loaded modules: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${_(this).m_versions.length}. Built-in actions: drawRectangle, readAppSource, inspectRuntime, installCode, loadModule, callRuntime, rollbackCode, resetConversation.`};
+			}
+			case 'installCode': return this.InstallCode(args);
+			case 'loadModule': return this.LoadModule(args);
+			case 'drawRectangle':
+			case 'callRuntime': {
+				let name=action.name==='drawRectangle'?'drawRectangle':args.name;
+				let input=action.name==='drawRectangle'?args:args.arguments??{};
+				let fn=this.GetRuntime()[name];
+				if (typeof fn!=='function') throw new Error('Runtime function not found: '+String(name));
+				let value=await fn(input, {image});
+				let output=value&&typeof value==='object'&&'image' in value?value.image:value;
+				if (output&&typeof output.base64==='string'&&/^image\/(png|jpeg|webp)$/.test(output.mimeType)) {
+					return {message: typeof value.message==='string'?value.message:`${name} updated the current image.`, image: {
+						...image, id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
+						, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
+						, prompt: `Local runtime edit: ${name}`
+						, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+						, aspectRatio: image?.aspectRatio||'1:1'
+						, title: output.title||`${image?.title||'Image'} · ${name}`
+					}};
+				}
+				return {message: `${name}: ${(typeof value==='string'?value:JSON.stringify(value)??'completed').slice(0,12000)}`};
+			}
+			case 'rollbackCode': return {message: this.Rollback()};
+			case 'resetConversation':
+				this.ResetConversation();
+				return {message: 'Conversation cleared.', conversationReset: true};
+			default: throw new Error('Unsupported local action: '+action.name);
+		}
 	};
 
 	_['public'].componentDidMount=function () {
 		let $this=_(this);
-		$this.m_ui=$this.MakeUI();
-		$this.m_detach=$this.m_runtime.AttachUI($this.m_ui);
+		$this.GetRuntime();
 		$this.m_click=(event)=>$this.HandleClick(event);
 		$this.m_input=(event)=>{
 			if (event.target===$this.Node('input')) $this.m_state.inputText=event.target.value;
@@ -262,7 +407,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_key=(event)=>{
 			if (event.target===$this.Node('input')&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing) {
 				event.preventDefault();
-				$this.m_component.Send();
+				$this.Send();
 			}
 		};
 		let root=$this.m_root.current;
@@ -270,7 +415,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		root.addEventListener('input', $this.m_input);
 		root.addEventListener('keydown', $this.m_key);
 		$this.Update();
-		$this.m_runtime.Initialize().catch((error)=>$this.AddMessage('agent', `Runtime initialization failed: ${error.message||String(error)}`));
+		$this.m_assistant=new Assistant(this);
 	};
 
 	_['private'].HandleClick=function (event) {
@@ -284,11 +429,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 			return;
 		}
 		switch (node.dataset.action) {
-			case 'send': $this.m_component.Send(); break;
-			case 'select': $this.m_component.SelectMedia(); break;
-			case 'camera': $this.m_component.CaptureCamera(); break;
-			case 'download': $this.m_component.Download(); break;
-			case 'generate': $this.m_component.Generate(); break;
+			case 'send': $this.Send(); break;
+			case 'select': $this.SelectMedia(); break;
+			case 'camera': $this.CaptureCamera(); break;
+			case 'download': $this.Download(); break;
+			case 'generate': $this.Generate(); break;
 			case 'info': $this.Node('dialog').style.display='flex'; break;
 			case 'close-info': $this.Node('dialog').style.display='none'; break;
 			case 'copy-prompt': navigator.clipboard.writeText(this.m_state.generationPrompt||''); break;
@@ -330,7 +475,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 				let item=document.createElement('div');
 				item.className=`ca-message ca-${message.sender}`;
 				let time=document.createElement('small');
-				time.textContent=(message.sender==='user'?'您':'AI 創意總監 (Agent)')+' · '+message.timestamp;
+				time.textContent=(message.sender==='user'?'您':message.sender==='system'?'App':'AI 創意總監 (Agent)')+' · '+message.timestamp;
 				item.appendChild(time);
 				if (message.includedImage) {
 					let preview=document.createElement('img');
@@ -379,31 +524,23 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		let message=String(text??$this.m_state.inputText).trim();
 		if (!message||$this.m_state.isConsulting) return;
-		if (/^(?:reset|清除|清空|重設)\s*(?:對話|聊天|對話紀錄)$/i.test(message)) {
-			$this.m_ui.ResetConversation();
-			return;
-		}
 		$this.AddMessage('user', message);
 		$this.SetValues({inputText: '', isConsulting: true});
 		try {
-			let restored=await $this.m_runtime.RecoverIfRequested(message);
-			if (restored) { $this.AddMessage('agent', restored); return; }
-			let handler=$this.m_ui.GetConversationHandler();
+			let handler=$this.m_handler;
 			if (handler) {
-				try { await handler(message, $this.m_ui); }
+				try { await handler(message, this); }
 				catch (error) {
 					let recovery='';
-					while ($this.m_runtime.HasVersion()&&$this.m_ui.GetConversationHandler()===handler) recovery=$this.m_runtime.Rollback();
-					if ($this.m_ui.GetConversationHandler()===handler) $this.m_ui.SetConversationHandler(null);
+					while ($this.m_versions.length&&$this.m_handler===handler) recovery=this.Rollback();
+					if ($this.m_handler===handler) $this.m_handler=null;
 					throw new Error(`${error.message||String(error)}. ${recovery}`);
 				}
 			}
-			else {
-				await $this.m_runtime.Initialize();
-				await $this.m_conversation.Send(message, $this.m_ui);
-			}
+			else if ($this.m_messageListener) await $this.m_messageListener(message);
+			else throw new Error('Assistant is unavailable.');
 		}
-		catch (error) { $this.AddMessage('agent', `Conversation failed: ${error.message||String(error)}`); }
+		catch (error) { await this.NotifyAssistant('Conversation failed', {Error: error.message||String(error)}); }
 		finally { $this.SetValues({isConsulting: false}); }
 	};
 
@@ -413,9 +550,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 			let image=await $this.m_images.Select($this.m_state.selectedRatio);
 			if (!image) return;
 			$this.SetValues({activeImage: image, history: [image, ...$this.m_state.history]});
-			$this.AddMessage('agent', `我已載入影像「${image.title}」。您可以要求本地編輯，或討論其他影像修改。`, {includedImage: image});
+			await this.NotifyAssistant('Media selected', {Title: image.title}, image);
 		}
-		catch (error) { $this.AddMessage('agent', `Failed to select media: ${error.message||String(error)}`); }
+		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
 
 	_['public'].CaptureCamera=async function () {
@@ -424,9 +561,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 			let image=await $this.m_images.Capture($this.m_state.selectedRatio);
 			if (!image) return;
 			$this.SetValues({activeImage: image, history: [image, ...$this.m_state.history]});
-			$this.AddMessage('agent', '已接收到照片。您可以描述要畫的矩形，也可以討論其他影像修改。', {includedImage: image});
+			await this.NotifyAssistant('Camera image captured', {Title: image.title}, image);
 		}
-		catch (error) { $this.AddMessage('agent', `Camera failed: ${error.message||String(error)}`); }
+		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
 
 	_['public'].Generate=async function (prompt) {
@@ -439,16 +576,16 @@ var CustomAgent=Function.extend(React.Component, function () {
 			let generated=await $this.m_images.Generate(text, state.activeImage, state.selectedRatio, state.history.length+1);
 			let image=generated.Image;
 			$this.SetValues({activeImage: image, history: [image, ...state.history]});
-			$this.AddMessage('agent', '已為您生成新的視覺修訂版本。', {includedImage: image});
+			await this.NotifyAssistant('Image generation completed', {Title: image.title, Prompt: text}, image);
 		}
-		catch (error) { $this.AddMessage('agent', `Image generation failed: ${error.message||String(error)}`); }
+		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 		finally { $this.SetValues({isGenerating: false}); }
 	};
 
 	_['public'].Download=async function () {
 		let $this=_(this);
 		try { await $this.m_images.Download($this.m_state.activeImage); }
-		catch (error) { $this.AddMessage('agent', `Download failed: ${error.message||String(error)}`); }
+		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
 
 	_['public'].componentWillUnmount=function () {
@@ -457,24 +594,33 @@ var CustomAgent=Function.extend(React.Component, function () {
 		root?.removeEventListener('click', $this.m_click);
 		root?.removeEventListener('input', $this.m_input);
 		root?.removeEventListener('keydown', $this.m_key);
-		$this.m_detach?.();
-		$this.m_ui?.Destroy();
+		$this.m_assistant?.Destroy();
+		let runtime=this.GetRuntime();
+		if (runtime.UI===this) delete runtime.UI;
+		for (let name of this.Mounted()) this.Unmount(name);
+		$this.m_listeners.clear();
 	};
 
 	_['public'].render=function () {
 		return React.createElement('div', {ref: _(this).m_root, style: {height: '100%', width: '100%'}, dangerouslySetInnerHTML: {__html: agentTemplate}});
 	};
 
-	_['private'].m_component=null;
 	_['private'].m_root=null;
 	_['private'].m_state=null;
-	_['private'].m_runtime=null;
-	_['private'].m_conversation=null;
+	_['private'].m_assistant=null;
+	_['private'].m_owner=null;
+	_['private'].m_versions=null;
+	_['private'].m_mounted=null;
+	_['private'].m_listeners=null;
+	_['private'].m_handler=null;
+	_['private'].m_messageListener=null;
+	_['private'].m_eventListener=null;
+	_['private'].m_installing=false;
+	_['private'].m_startup=null;
+	_['private'].m_sources=null;
 	_['private'].m_images=null;
-	_['private'].m_ui=null;
 	_['private'].m_lastMessages=null;
 	_['private'].m_lastHistory=null;
-	_['private'].m_detach=null;
 	_['private'].m_click=null;
 	_['private'].m_input=null;
 	_['private'].m_key=null;

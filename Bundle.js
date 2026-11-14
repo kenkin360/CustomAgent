@@ -37,12 +37,11 @@ var Bundle=Function.extend(Function, function () {
 
 	Bundle.Config=[
 		['CustomAgent', Bundle.CustomAgent('CustomAgent.js')]
-		, ['ConversationController', Bundle.CustomAgent('ConversationController.js')]
+		, ['Assistant', Bundle.CustomAgent('Assistant.js')]
 		, ['ImageService', Bundle.CustomAgent('ImageService.js')]
-		, ['RuntimeActions', Bundle.CustomAgent('RuntimeActions.js')]
-		, ['DrawingActions', Bundle.CustomAgent('DrawingActions.js')]
+		, ['DrawingCode', Bundle.CustomAgent('DrawingCode.js')]
 		, ['agentTemplate', Bundle.CustomAgent('views/agent.html.js')]
-		, ['UPSCALE_INSTALL_CODE', Bundle.CustomAgent('UpscaleCode.js')]
+		, ['UpscaleCode', Bundle.CustomAgent('UpscaleCode.js')]
 	];
 });
 
