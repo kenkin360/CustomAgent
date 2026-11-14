@@ -1,23 +1,16 @@
 # CustomAgent
 
-Flow SDK image discussion and local editing app. `App.tsx` is the Flow entry point.
+Flow host contains exactly four files: `App.tsx`, `Bundle.js`, `Resource.js`, and `Function.extend.js`. Copy those four files into Flow host using the same filenames. `App.tsx` is a small `Function.extend(React.Component)` loader, following FlowerX's entry point. `Bundle.js` loads the following plain JavaScript files from this repository through `esm.sh` as classic scripts, in dependency order:
 
-## Modules
+- `UpscaleCode.js` — startup `installCode` source for WebSR
+- `views/agent.html.js` — interface markup and styles
+- `DrawingActions.js` — validated local rectangle drawing
+- `RuntimeActions.js` — runtime installation, module loading, source inspection, and rollback
+- `AppUI.js` — runtime UI bridge and mounted extension slots
+- `ImageService.js` — Flow media, camera, generation, and download operations
+- `ConversationController.js` — agent dialogue, local actions, and final response
+- `CustomAgent.js` — React component and interface events
 
-| File | Responsibility |
-| --- | --- |
-| `App.tsx` | React screen, state, and event entry points |
-| `ConversationController.js` | Model dialogue, action planning, results, and final replies |
-| `AppUI.js` | Runtime UI API, extensions, conversation handler, and state bridge |
-| `ImageService.js` | Flow media, camera, image generation, and downloads |
-| `DrawingActions.js` | Validated local rectangle operation |
-| `runtimeActions.ts` | Runtime installation, module loading, source inspection, and rollback |
-| `upscaleCode.ts` | Startup `installCode` implementation for image upscaling |
-| `Function.extend.js` | Class implementation used by the JavaScript modules |
-| `types.ts` | Shared TypeScript interfaces |
+Every remotely loaded script defines its expected global name and has no top-level `import` or `export`. `UpscaleCode.js` contains an `export default` only inside the JavaScript source string passed to `installCode` at runtime. `Bundle.js` is loaded in Flow host as an ES module and exports `Bundle` for `App.tsx`.
 
-The JavaScript classes follow FlowerX's `Function.extend(Object, factory)` pattern with `_['public']` and `_['private']` members. `App.tsx` imports the classes as ES modules; `Function.extend.js` is imported for its script side effect and has no `export` statement.
-
-The user message is shown before the runtime rollback check. Conversation history sent to the model contains the preceding 20 messages, excluding the newly submitted message, which is sent separately. Local actions do not start image generation. The user starts image generation explicitly through the generate control.
-
-To use this in Flow host, add all source files in this repository with their exact filenames and select `App.tsx` as the entry point. The app depends on Flow's `flow-sdk`, React, and `lucide-react`.
+Sending a message displays it before the rollback intent check. The model receives up to 20 preceding messages plus the current message separately. Image generation starts only after the user chooses Generate. The UI supports multiple input lines with Shift+Enter.
