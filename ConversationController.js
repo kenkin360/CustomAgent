@@ -1,5 +1,3 @@
-import './Function.extend.js';
-
 var ConversationController=Function.extend(Object, function () {
 	var _=this(ConversationController);
 	ConversationController=_[ConversationController];
@@ -125,4 +123,4 @@ var ConversationController=Function.extend(Object, function () {
 	};
 });
 
-export { ConversationController };
+globalThis.ConversationController=ConversationController;
