@@ -6,10 +6,9 @@ Flow host contains exactly four files: `App.tsx`, `Bundle.js`, `Resource.js`, an
 - `views/agent.html.js` — interface markup and styles
 - `DrawingActions.js` — validated local rectangle drawing
 - `RuntimeActions.js` — runtime installation, module loading, source inspection, and rollback
-- `AppUI.js` — runtime UI bridge and mounted extension slots
 - `ImageService.js` — Flow media, camera, generation, and download operations
 - `ConversationController.js` — agent dialogue, local actions, and final response
-- `CustomAgent.js` — React component and interface events
+- `CustomAgent.js` — React component, interface events, and its private runtime UI bridge
 
 Every remotely loaded file is a classic script with a top-level `var` whose name exactly matches its `Bundle.Config` key. `Resource.Module` reads that name from `globalThis`; classic scripts expose top-level `var` there without an explicit assignment. Remote scripts have no top-level `import` or `export`. `UpscaleCode.js` contains `export default` only inside the JavaScript source string passed to `installCode` at runtime. The host's `Bundle.js` and `Resource.js` remain ES modules because `App.tsx` imports them.
 
