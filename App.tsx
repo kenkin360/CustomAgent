@@ -46,7 +46,7 @@ var App=Function.extend(React.Component, function () {
 
 	_['public'].render=function () {
 		let $this=_(this);
-		if ($this.m_agent) return React.createElement($this.m_agent, {...this.props, HostSourceUrl: import.meta.url});
+		if ($this.m_agent) return React.createElement($this.m_agent, {...this.props, HostSourceUrl: import.meta.url, SourceFiles: Bundle.Config});
 		let progress=$this.m_progress;
 		let percent=progress.Total?Math.round(progress.Completed*100/progress.Total):0;
 		return React.createElement('div', {style: {position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: '#090e19', color: '#e5e7eb', fontFamily: 'system-ui, sans-serif'}},
