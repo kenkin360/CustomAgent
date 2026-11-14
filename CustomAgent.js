@@ -148,7 +148,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let input=this.Node('input');
 		if (input.value!==state.inputText) input.value=state.inputText;
 		this.Node('pending').style.display=state.accumulatedChanges.length?'block':'none';
-		this.Node('pending-count').textContent=`${state.accumulatedChanges.length} confirmed changes`;
+		this.Node('pending-count').textContent=`已確認的改動項目 (${state.accumulatedChanges.length})`;
 		this.Node('pending-list').textContent=state.accumulatedChanges.map((item, index)=>`${index+1}. ${item}`).join('\n');
 		this.Node('pending-list').style.whiteSpace='pre-wrap';
 		this.Node('pending-prompt').textContent=state.generationPrompt||'';
@@ -159,7 +159,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 				let item=document.createElement('div');
 				item.className=`ca-message ca-${message.sender}`;
 				let time=document.createElement('small');
-				time.textContent=(message.sender==='user'?'You':'Agent')+' · '+message.timestamp;
+				time.textContent=(message.sender==='user'?'您':'AI 創意總監 (Agent)')+' · '+message.timestamp;
 				item.appendChild(time);
 				if (message.includedImage) {
 					let preview=document.createElement('img');
@@ -173,12 +173,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 				if (message.suggestedPrompt) {
 					let prompt=document.createElement('div');
 					prompt.className='ca-prompt';
-					prompt.textContent='Suggested prompt: '+message.suggestedPrompt;
+					prompt.textContent='整合提示詞草稿：'+message.suggestedPrompt;
 					item.appendChild(prompt);
 					let copy=document.createElement('button');
 					copy.dataset.action='copy-message-prompt';
 					copy.dataset.messageId=message.id;
-					copy.textContent='Copy prompt';
+					copy.textContent='複製';
 					item.appendChild(copy);
 				}
 				return item;
@@ -242,7 +242,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			let image=await $this.m_images.Select($this.m_state.selectedRatio);
 			if (!image) return;
 			$this.SetValues({activeImage: image, history: [image, ...$this.m_state.history]});
-			$this.AddMessage('agent', `Loaded image “${image.title}”. You can request a local edit or discuss changes.`, {includedImage: image});
+			$this.AddMessage('agent', `我已載入影像「${image.title}」。您可以要求本地編輯，或討論其他影像修改。`, {includedImage: image});
 		}
 		catch (error) { $this.AddMessage('agent', `Failed to select media: ${error.message||String(error)}`); }
 	};
@@ -253,7 +253,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			let image=await $this.m_images.Capture($this.m_state.selectedRatio);
 			if (!image) return;
 			$this.SetValues({activeImage: image, history: [image, ...$this.m_state.history]});
-			$this.AddMessage('agent', 'Camera image loaded.', {includedImage: image});
+			$this.AddMessage('agent', '已接收到照片。您可以描述要畫的矩形，也可以討論其他影像修改。', {includedImage: image});
 		}
 		catch (error) { $this.AddMessage('agent', `Camera failed: ${error.message||String(error)}`); }
 	};
@@ -268,7 +268,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			let generated=await $this.m_images.Generate(text, state.activeImage, state.selectedRatio, state.history.length+1);
 			let image=generated.Image;
 			$this.SetValues({activeImage: image, history: [image, ...state.history]});
-			$this.AddMessage('agent', 'New image version generated.', {includedImage: image});
+			$this.AddMessage('agent', '已為您生成新的視覺修訂版本。', {includedImage: image});
 		}
 		catch (error) { $this.AddMessage('agent', `Image generation failed: ${error.message||String(error)}`); }
 		finally { $this.SetValues({isGenerating: false}); }
