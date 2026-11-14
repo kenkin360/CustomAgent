@@ -15,4 +15,3 @@ var agentTemplate=String.raw`
  </div>
  <div class="ca-dialog" data-role="dialog"><div><h3>Visual Concept Director</h3><p>可討論影像修改或要求本地操作。只有按下生成按鈕才會產生新影像，也可以要求查閱及擴充本次執行的程式碼。</p><button data-action="close-info">關閉</button></div></div><div class="ca-slot ca-overlay" data-slot="overlay"></div>
 </div>`;
-globalThis.agentTemplate=agentTemplate;
