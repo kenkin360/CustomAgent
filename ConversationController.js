@@ -123,4 +123,3 @@ var ConversationController=Function.extend(Object, function () {
 	};
 });
 
-globalThis.ConversationController=ConversationController;
