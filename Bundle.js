@@ -39,7 +39,6 @@ var Bundle=Function.extend(Function, function () {
 		['CustomAgent', Bundle.CustomAgent('CustomAgent.js')]
 		, ['ConversationController', Bundle.CustomAgent('ConversationController.js')]
 		, ['ImageService', Bundle.CustomAgent('ImageService.js')]
-		, ['AppUI', Bundle.CustomAgent('AppUI.js')]
 		, ['RuntimeActions', Bundle.CustomAgent('RuntimeActions.js')]
 		, ['DrawingActions', Bundle.CustomAgent('DrawingActions.js')]
 		, ['agentTemplate', Bundle.CustomAgent('views/agent.html.js')]
