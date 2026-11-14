@@ -47,5 +47,4 @@ var Bundle=Function.extend(Function, function () {
 	];
 });
 
-globalThis.Bundle=Bundle;
 export { Bundle };
