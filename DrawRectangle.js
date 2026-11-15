@@ -46,7 +46,6 @@ var DrawRectangle=Function.extend(Object, function () {
 		}};
 	};
 
-	DrawRectangle.ActionName='drawRectangle';
 	DrawRectangle.Default=new DrawRectangle();
 	DrawRectangle.Run=DrawRectangle.Default.Run.bind(DrawRectangle.Default);
 	DrawRectangle.Run.Description='Draw a rectangle on the current image. Arguments: normalized x, y, width, height (0–1), stroke (#RRGGBB), strokeWidth (pixels), optional fill (#RRGGBB).';
