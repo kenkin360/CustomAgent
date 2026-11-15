@@ -50,14 +50,15 @@ var App=Function.extend(React.Component, function () {
 		if ($this.m_agent) return React.createElement($this.m_agent, {...this.props, HostSourceUrl: import.meta.url, SourceFiles: Bundle.Config});
 		let progress=$this.m_progress;
 		let percent=progress.Total?Math.round(progress.Completed*100/progress.Total):0;
+		let chinese=/^zh\b/i.test(navigator.language||'');
 		return React.createElement('div', {style: {position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: '#090e19', color: '#e5e7eb', fontFamily: 'system-ui, sans-serif'}},
 			React.createElement('div', {style: {width: 360, maxWidth: '85vw'}},
 				React.createElement('h2', null, 'CustomAgent'),
-				React.createElement('div', {style: {fontSize: 12, marginBottom: 8}}, $this.m_error?String($this.m_error.message||$this.m_error):progress.File||'Starting…'),
+				React.createElement('div', {style: {fontSize: 12, marginBottom: 8}}, $this.m_error?String($this.m_error.message||$this.m_error):progress.File||(chinese?'啟動中…':'Starting…')),
 				React.createElement('div', {role: 'progressbar', 'aria-valuenow': progress.Completed, 'aria-valuemin': 0, 'aria-valuemax': progress.Total, style: {height: 5, background: '#263248', borderRadius: 5}},
 					React.createElement('div', {style: {height: '100%', width: percent+'%', background: '#6959ff', borderRadius: 5}})),
 				React.createElement('div', {style: {fontSize: 11, marginTop: 6, textAlign: 'right'}}, `${progress.Completed} / ${progress.Total}`),
-				$this.m_error&&React.createElement('button', {type: 'button', onClick: $this.m_reload, style: {marginTop: 12, padding: '7px 14px'}}, 'Reload')));
+				$this.m_error&&React.createElement('button', {type: 'button', onClick: $this.m_reload, style: {marginTop: 12, padding: '7px 14px'}}, chinese?'重新載入':'Reload')));
 	};
 
 	_['private'].m_agent=null;
