@@ -39,7 +39,7 @@ var Assistant=Function.extend(Object, function () {
 		}
 		catch (error) { setupError=[setupError,error.message||String(error)].filter(Boolean).join('; '); }
 		try {
-			let response=await this.GenerateText('', {systemInstruction: `
+			let response=await this.GenerateText('.', {systemInstruction: `
 你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，僅描述確實可用的能力。若啟動失敗，說明真實錯誤。請依瀏覽器語系或使用者對話語言回覆；無法判斷時使用英文。
 ${capabilities.message}
 ${runtime.message}
@@ -151,7 +151,7 @@ Choose the next action, revise the plan, or give a final answer. Do not repeat s
 				let result=await app.RunAction(action);
 				if (turn?.cancelled) return;
 				if (result.conversationReset) {
-					let fresh=await this.GenerateText('', {systemInstruction: `
+					let fresh=await this.GenerateText('.', {systemInstruction: `
 App 已清空對話。以使用者這次要求的語言自然回覆，無須提及先前對話。不要輸出操作控制 JSON。
 `});
 					if (turn?.cancelled) return;
