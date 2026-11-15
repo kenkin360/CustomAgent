@@ -234,11 +234,8 @@ var Resource=Function.extend(Promise, function () {
 				_['base'].apply(this, arguments);
 				return;
 			}
-			let errorKey='__ResourceInlineError_'+Math.random().toString(36).slice(2);
-			let wrapped=`try {\n${source}\n} catch (error) { globalThis[${JSON.stringify(errorKey)}]=error; }`;
-			let url=`data:text/javascript;charset=utf-8,${encodeURIComponent(wrapped)}`;
+			let url=`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`;
 			_['base'].call(this, name, url, readyMember)(function () {
-				_(this).GetState().ErrorKey=errorKey;
 				this.Start();
 			});
 		}
@@ -257,12 +254,10 @@ var Resource=Function.extend(Promise, function () {
 			element.async=true;
 			let finish=(error, value)=>{
 				window.removeEventListener('error', state.EvaluationHandler, true);
-				delete globalThis[state.ErrorKey];
 				$this.Finish(error, value);
 			};
 			state.LoadHandler=()=>{
 				try {
-					if (Object.prototype.hasOwnProperty.call(globalThis, state.ErrorKey)) throw globalThis[state.ErrorKey];
 					let value=globalThis[state.Name];
 					if (!value||typeof value.then==='function'||(state.ReadyMember&&!value[state.ReadyMember])) {
 						throw new Error(`${state.Name} did not expose a ready module value.`);
