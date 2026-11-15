@@ -31,6 +31,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_lastMessages=null;
 		$this.m_lastConsulting=null;
 		$this.m_lastHistory=null;
+		$this.m_activeTurn=null;
+		$this.m_locale=(navigator.languages||[]).find((language)=>/^zh\b/i.test(language))?'zh':/^zh\b/i.test(navigator.language||'')?'zh':'en';
 	}
 
 	_['private'].Node=function (role) {
@@ -55,6 +57,17 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].Slots=['header', 'canvas', 'chat', 'overlay'];
+	_['public'].Text=function (key) {
+		let english={tagline: 'Describe an edit to use local tools, or generate an image', help: 'Help', target: 'Target Image', download: 'Download', empty: 'No image selected. Load an image or describe an idea in chat.', media: '＋ Media', camera: 'Camera', generating: 'Generating image…', history: 'Image versions', copyPrompt: 'Copy prompt', generate: 'Generate image from confirmed changes', ratio: 'Output ratio', original: 'Original', input: 'Discuss an idea, draw a rectangle, inspect code, or create a local tool…', send: 'Send', stop: 'Stop', about: "Discuss image changes or ask for local operations. Only the Generate button creates a new image. You can also inspect and extend this session's code.", close: 'Close', confirmedChanges: 'Confirmed changes', you: 'You', agent: 'Assistant', promptDraft: 'Combined prompt draft: ', copy: 'Copy', thinking: 'Thinking and running local operations…'};
+		let chinese={tagline: '描述修改即可執行本地操作，也可選擇生成影像', help: '使用說明', target: '當前聚焦影像 (Target Image)', download: '下載', empty: '尚未選擇或拍攝影像。請載入圖片，或在對話中描述構想。', media: '＋ 媒體庫', camera: '拍照', generating: 'AI 正在修訂影像…', history: '迭代歷程版本', copyPrompt: '複製提示詞', generate: '依已確認改動生成影像', ratio: '輸出比例', original: '原圖', input: '討論構想、畫矩形、查看程式碼，或編寫本地功能…', send: '傳送', stop: '停止', about: '可討論影像修改或要求本地操作。只有按下生成按鈕才會產生新影像，也可以要求查閱及擴充本次執行的程式碼。', close: '關閉', confirmedChanges: '已確認的改動項目', you: '您', agent: 'AI 助理 (Agent)', promptDraft: '整合提示詞草稿：', copy: '複製', thinking: '正在理解要求並處理本地操作…'};
+		return (_(this).m_locale==='zh'?chinese:english)[key]||english[key]||key;
+	};
+	_['public'].Localize=function () {
+		let root=_(this).m_root.current;
+		if (!root) return;
+		for (let node of root.querySelectorAll('[data-i18n]')) node.textContent=this.Text(node.dataset.i18n);
+		for (let node of root.querySelectorAll('[data-i18n-placeholder]')) node.placeholder=this.Text(node.dataset.i18nPlaceholder);
+	};
 
 	_['public'].GetState=function () {
 		let state=_(this).m_state;
@@ -168,6 +181,13 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.SetValues({activeImage: image});
 	};
 	_['public'].SendMessage=function (text) { return this.Send(text); };
+	_['public'].Stop=function () {
+		let $this=_(this);
+		if (!$this.m_activeTurn) return;
+		$this.m_activeTurn.cancelled=true;
+		$this.m_activeTurn=null;
+		$this.SetValues({isConsulting: false});
+	};
 	_['public'].PickMedia=function () { return this.SelectMedia(); };
 	_['public'].RollbackCode=function () { return this.Rollback(); };
 
@@ -253,17 +273,18 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return $this.m_startup;
 	};
 
-	_['private'].RegisterExtension=function (name, Type, track) {
-		if (typeof Type!=='function'||!(Type.prototype instanceof Extensible)) throw new Error(name+' must extend Extensible.');
+	_['private'].RegisterModule=function (name, value, snapshot, track) {
+		if (value==null) throw new Error(name+' did not expose a module value.');
 		let runtime=this.GetRuntime();
-		let snapshot=this.Capture();
-		let before={...runtime};
 		try {
-			let instance=new Type(runtime);
-			runtime.Modules[name]=instance;
-			let changed=this.GetNames().filter((key)=>runtime[key]!==before[key]);
+			runtime.Modules[name]=value;
+			let actionName=value.ActionName;
+			if (actionName!==undefined) {
+				if (typeof actionName!=='string'||!/^[A-Za-z_$][\w$]*$/.test(actionName)||typeof value.Run!=='function') throw new Error(name+' has an invalid ActionName or Run method.');
+				runtime[actionName]=value.Run;
+			}
 			if (track) this.m_versions.push(snapshot);
-			return {message: `${name} loaded. Registered functions: ${changed.join(', ')||'(none)'}. Reversible versions: ${this.m_versions.length}.`};
+			return {message: `${name} loaded. Registered functions: ${actionName||'(none)'}. Reversible versions: ${this.m_versions.length}.`};
 		}
 		catch (error) {
 			this.Restore(snapshot);
@@ -327,14 +348,21 @@ var CustomAgent=Function.extend(React.Component, function () {
 				return {message: `AppRuntime functions: ${this.GetNames().map((name)=>name+(runtime[name].Description?': '+runtime[name].Description:'')).join('; ')||'(none)'}. Loaded extensions: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${_(this).m_versions.length}. Built-in actions: readAppSource, inspectRuntime, loadModule, callRuntime, rollbackCode, resetConversation.`};
 			}
 			case 'loadModule': {
-				if (typeof args.name!=='string'||!/^[A-Za-z_$][\w$]*$/.test(args.name)) throw new Error('Provide an extension class name.');
+				if (typeof args.name!=='string'||!/^[A-Za-z_$][\w$]*$/.test(args.name)) throw new Error('Provide a module name.');
 				let url=typeof args.code==='string'&&args.code.trim()
 					?`data:text/javascript;charset=utf-8,${encodeURIComponent(args.code)}`
 					:args.specifier;
-				if (typeof url!=='string'||!url) throw new Error('Provide extension code or a script URL.');
+				if (typeof url!=='string'||!url) throw new Error('Provide module code or a script URL.');
 				if (this.GetRuntime().Modules[args.name]&&!args.code) return {message: args.name+' is already loaded.'};
-				let Type=await new Resource.Module(args.name, url);
-				return this.RegisterExtension(args.name, Type, track);
+				let snapshot=this.Capture();
+				try {
+					let value=await new Resource.Module(args.name, url, args.readyMember);
+					return this.RegisterModule(args.name, value, snapshot, track);
+				}
+				catch (error) {
+					this.Restore(snapshot);
+					throw error;
+				}
 			}
 			case 'rollbackCode': return {message: this.Rollback()};
 			case 'resetConversation':
@@ -374,7 +402,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_key=(event)=>{
 			if (event.target===$this.Node('input')&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing) {
 				event.preventDefault();
-				$this.Send();
+				if (!$this.m_state.isConsulting) $this.Send();
 			}
 		};
 		let root=$this.m_root.current;
@@ -396,7 +424,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			return;
 		}
 		switch (node.dataset.action) {
-			case 'send': $this.Send(); break;
+			case 'send': $this.m_state.isConsulting?$this.m_owner.Stop():$this.Send(); break;
 			case 'select': $this.SelectMedia(); break;
 			case 'camera': $this.CaptureCamera(); break;
 			case 'download': $this.Download(); break;
@@ -427,10 +455,13 @@ var CustomAgent=Function.extend(React.Component, function () {
 		this.Node('empty').style.display=state.activeImage?'none':'block';
 		this.Node('image-ratio').textContent=state.activeImage?.width&&state.activeImage?.height?`${state.activeImage.width} × ${state.activeImage.height}`:'';
 		this.Node('generating').style.display=state.isGenerating?'flex':'none';
+		this.m_owner.Localize();
+		let sendButton=root.querySelector('[data-action="send"]');
+		sendButton.textContent=state.isConsulting?this.m_owner.Text('stop'):this.m_owner.Text('send');
 		let input=this.Node('input');
 		if (input.value!==state.inputText) input.value=state.inputText;
 		this.Node('pending').style.display=state.accumulatedChanges.length?'block':'none';
-		this.Node('pending-count').textContent=`已確認的改動項目 (${state.accumulatedChanges.length})`;
+		this.Node('pending-count').textContent=`${this.m_owner.Text('confirmedChanges')} (${state.accumulatedChanges.length})`;
 		this.Node('pending-list').textContent=state.accumulatedChanges.map((item, index)=>`${index+1}. ${item}`).join('\n');
 		this.Node('pending-list').style.whiteSpace='pre-wrap';
 		this.Node('pending-prompt').textContent=state.generationPrompt||'';
@@ -441,7 +472,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 				let item=document.createElement('div');
 				item.className=`ca-message ca-${message.sender}`;
 				let time=document.createElement('small');
-				time.textContent=(message.sender==='user'?'您':message.sender==='system'?'App':'AI 創意總監 (Agent)')+' · '+message.timestamp;
+					time.textContent=(message.sender==='user'?this.m_owner.Text('you'):message.sender==='system'?'App':this.m_owner.Text('agent'))+' · '+message.timestamp;
 				item.appendChild(time);
 				if (message.includedImage) {
 					let preview=document.createElement('img');
@@ -455,12 +486,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 				if (message.suggestedPrompt) {
 					let prompt=document.createElement('div');
 					prompt.className='ca-prompt';
-					prompt.textContent='整合提示詞草稿：'+message.suggestedPrompt;
+					prompt.textContent=this.m_owner.Text('promptDraft')+message.suggestedPrompt;
 					item.appendChild(prompt);
 					let copy=document.createElement('button');
 					copy.dataset.action='copy-message-prompt';
 					copy.dataset.messageId=message.id;
-					copy.textContent='複製';
+					copy.textContent=this.m_owner.Text('copy');
 					item.appendChild(copy);
 				}
 				return item;
@@ -471,7 +502,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 				thinking.className='ca-thinking';
 				thinking.setAttribute('role', 'status');
 				thinking.setAttribute('aria-live', 'polite');
-				thinking.textContent='正在理解要求並處理本地操作…';
+				thinking.textContent=this.m_owner.Text('thinking');
 				items.splice(pendingIndex+1, 0, thinking);
 			}
 			list.replaceChildren(...items);
@@ -501,12 +532,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		let message=String(text??$this.m_state.inputText).trim();
 		if (!message||$this.m_state.isConsulting) return;
+		let turn={cancelled: false};
+		$this.m_activeTurn=turn;
 		$this.AddMessage('user', message);
 		$this.SetValues({inputText: '', isConsulting: true});
 		try {
 			let handler=$this.m_handler;
 			if (handler) {
-				try { await handler(message, this); }
+					try { await handler(message, this, turn); }
 				catch (error) {
 					let recovery='';
 					while ($this.m_versions.length&&$this.m_handler===handler) recovery=this.Rollback();
@@ -514,11 +547,16 @@ var CustomAgent=Function.extend(React.Component, function () {
 					throw new Error(`${error.message||String(error)}. ${recovery}`);
 				}
 			}
-			else if ($this.m_messageListener) await $this.m_messageListener(message);
+			else if ($this.m_messageListener) await $this.m_messageListener(message, turn);
 			else throw new Error('Assistant is unavailable.');
 		}
-		catch (error) { await this.NotifyAssistant('Conversation failed', {Error: error.message||String(error)}); }
-		finally { $this.SetValues({isConsulting: false}); }
+		catch (error) { if (!turn.cancelled) await this.NotifyAssistant('Conversation failed', {Error: error.message||String(error)}); }
+		finally {
+			if ($this.m_activeTurn===turn) {
+				$this.m_activeTurn=null;
+				$this.SetValues({isConsulting: false});
+			}
+		}
 	};
 
 	_['public'].SelectMedia=async function () {
@@ -567,6 +605,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].componentWillUnmount=function () {
 		let $this=_(this);
+		this.Stop();
 		let root=$this.m_root.current;
 		root?.removeEventListener('click', $this.m_click);
 		root?.removeEventListener('input', $this.m_input);
@@ -598,6 +637,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['private'].m_lastMessages=null;
 	_['private'].m_lastConsulting=null;
 	_['private'].m_lastHistory=null;
+	_['private'].m_activeTurn=null;
+	_['private'].m_locale=null;
 	_['private'].m_click=null;
 	_['private'].m_input=null;
 	_['private'].m_key=null;
