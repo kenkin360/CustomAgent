@@ -69,6 +69,7 @@ var ImageService=Function.extend(Object, function () {
 	_['public'].Generate=async function (prompt, image, ratio, index) {
 		let flow=_(this).m_flow;
 		let mediaId=image?.mediaId;
+		let aspectRatio=ratio==='original'?(image?this.GetAspectRatio(await this.GetDimensions(image)):undefined):ratio;
 		if (image&&!mediaId) {
 			let upload=await flow.upload({base64: image.base64, mimeType: image.mimeType, name: image.title});
 			mediaId=upload.mediaId;
@@ -76,7 +77,7 @@ var ImageService=Function.extend(Object, function () {
 		let result=await flow.generate.image({
 			prompt
 			, referenceImageMediaIds: mediaId?[mediaId]:undefined
-			, aspectRatio: ratio
+			, aspectRatio
 			, modelDisplayName: ImageService.ModelDisplayName
 		});
 		let dimensions=await this.GetDimensions(result);

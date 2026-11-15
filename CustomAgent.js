@@ -12,7 +12,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			, history: []
 			, messages: []
 			, inputText: ''
-			, selectedRatio: '16:9'
+			, selectedRatio: 'original'
 			, accumulatedChanges: []
 			, generationPrompt: ''
 			, isConsulting: false
@@ -157,7 +157,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 	_['public'].SetInput=function (value) { this.UpdateConversation({inputText: value}); };
 	_['public'].SetRatio=function (value) {
-		if (!['1:1', '16:9', '9:16', '4:3', '3:4'].includes(value)) throw new Error('Unsupported aspect ratio.');
+		if (!['original', '1:1', '16:9', '9:16', '4:3', '3:4'].includes(value)) throw new Error('Unsupported aspect ratio.');
 		this.UpdateConversation({selectedRatio: value});
 	};
 	_['public'].SelectVersion=function (id) {
@@ -484,6 +484,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 		this.Node('history-count').textContent=state.history.length;
 		for (let button of this.Node('history').children) button.classList.toggle('ca-selected', button.dataset.version===state.activeImage?.id);
+		if (state.isConsulting) this.Node('messages').scrollTop=this.Node('messages').scrollHeight;
 	};
 
 	_['public'].Send=async function (text) {

@@ -89,7 +89,7 @@ var Assistant=Function.extend(Object, function () {
 		if (prior.at(-1)?.sender==='user'&&prior.at(-1)?.text===message) prior.pop();
 		let history=prior.slice(-20).map((entry)=>`${entry.sender}: ${entry.text}`).join('\n\n');
 		let changes=initial.accumulatedChanges.length?initial.accumulatedChanges.map((entry, index)=>`${index+1}. ${entry}`).join('\n'):'(none)';
-		let question=`Current image: ${imageInfo?`${imageInfo.width} × ${imageInfo.height} pixels (${imageInfo.mimeType})`:'none'}\nSelected generation aspect ratio: ${initial.selectedRatio}\nPending generation changes:\n${changes}\nPrevious conversation (up to 20 messages):\n${history}\nCurrent user message:\n${message}`;
+		let question=()=>`Current image: ${imageInfo?`${imageInfo.width} × ${imageInfo.height} pixels (${imageInfo.mimeType})`:'none'}\nSelected generation aspect ratio: ${initial.selectedRatio}\nPending generation changes:\n${changes}\nPrevious conversation (up to 20 messages):\n${history}\nCurrent user message:\n${message}`;
 		let image=initial.activeImage;
 		let changesOut=initial.accumulatedChanges;
 		let promptOut=initial.generationPrompt;
@@ -101,8 +101,8 @@ var Assistant=Function.extend(Object, function () {
 		let structured=false;
 		let runtime=await app.InspectRuntime({});
 		for (;;) {
-			let request=reports.length?`${question}\nCurrent action plan: ${JSON.stringify(plan)}\nActual action results:\n${reports.map(JSON.stringify).join('\n')}\nChoose the next action, revise the plan, or give a final answer. Do not repeat successful actions or claim failed actions succeeded.`:question;
-			let options={systemInstruction: `You are the assistant running in this App. Actual capabilities: ${runtime.message}\nYou may discuss freely. Only the user's Generate button starts image generation. To request a local operation, append one final fenced json block with {"attemptPlan":[{"action":"name","attempts":1,"reason":"reason"}],"localAction":{"name":"name","arguments":{}}}. If no operation is needed use {"localAction":null}. The App executes one action and returns its actual result; decide what to do next after reading it. readAppSource with empty arguments lists files; use it to inspect implementation whenever needed. loadModule accepts {name,specifier} for an external classic script or {name,code} for new JavaScript. In either case the script declares exactly one top-level var with that name whose value is a Function.extend(Extensible, ...) class; its constructor receives AppRuntime and registers functions or mounts UI. Do not use import, export, or explicit globalThis assignment in this class. Use a new class name for each update; it may replace an existing runtime function. AppRuntime.UI is this App. Local operations that completed are not pending image generation changes. Optional JSON fields: accumulatedChanges, suggestedPrompt, aspectRatio. Answer naturally in the user's language. Never claim unreported success or show control JSON unless asked.`};
+			let request=reports.length?`${question()}\nCurrent action plan: ${JSON.stringify(plan)}\nActual action results:\n${reports.map(JSON.stringify).join('\n')}\nChoose the next action, revise the plan, or give a final answer. Do not repeat successful actions or claim failed actions succeeded.`:question();
+			let options={systemInstruction: `You are the assistant running in this App. Actual capabilities: ${runtime.message}\nYou may discuss freely. Only the user's Generate button starts image generation. To request a local operation, append one final fenced json block with {"attemptPlan":[{"action":"name","attempts":1,"reason":"reason"}],"localAction":{"name":"name","arguments":{}}}. If no operation is needed use {"localAction":null}. The App executes one action and returns its actual result; decide what to do next after reading it. readAppSource with empty arguments lists files; use it to inspect implementation whenever needed. loadModule accepts {name,specifier} for an external classic script or {name,code} for new JavaScript. In either case the script declares exactly one top-level var with that name whose value is a Function.extend(Extensible, ...) class; its constructor receives AppRuntime and registers functions or mounts UI. Do not use import, export, or explicit globalThis assignment in this class. Use a new class name for each update; it may replace an existing runtime function. AppRuntime.UI is this App. An extension can use standard browser Image and canvas APIs to edit the image as DrawRectangle.js does, return {image:{base64,mimeType}}, or mount controls through AppRuntime.UI.Mount. If a requested function is absent, inspect relevant source and implement an extension when requested; absence of a built-in action does not mean it cannot be done. Only report an operation as completed after its successful App result, including actual output dimensions. Local operations that completed are not pending image generation changes. Optional JSON fields: accumulatedChanges, suggestedPrompt, aspectRatio. Answer naturally in the user's language. Never claim unreported success or show control JSON unless asked.`};
 			if (image) options.images=[{base64: image.base64, mimeType: image.mimeType}];
 			let response=await this.GenerateText(request, options);
 			let control=$this.ReadControl(response.text);
@@ -112,7 +112,7 @@ var Assistant=Function.extend(Object, function () {
 				structured=true;
 				if (Array.isArray(data.accumulatedChanges)) changesOut=data.accumulatedChanges.filter((item)=>typeof item==='string');
 				if (typeof data.suggestedPrompt==='string') promptOut=data.suggestedPrompt;
-				if (['1:1', '16:9', '9:16', '4:3', '3:4'].includes(data.aspectRatio)) ratioOut=data.aspectRatio;
+				if (['original', '1:1', '16:9', '9:16', '4:3', '3:4'].includes(data.aspectRatio)) ratioOut=data.aspectRatio;
 				if (Array.isArray(data.attemptPlan)&&data.attemptPlan.length) plan=data.attemptPlan;
 			}
 			let action=data?.localAction;
@@ -129,15 +129,20 @@ var Assistant=Function.extend(Object, function () {
 					app.Reply(fresh.text.trim());
 					return;
 				}
-				if (result.image) { image=result.image; edited=result.image; }
+				if (result.image) {
+					image=result.image;
+					imageInfo={width: image.width, height: image.height, mimeType: image.mimeType};
+					edited=result.image;
+				}
 				reports.push({action: action.name, status: 'success', result: result.message, ...(result.image?{image: {width: result.image.width, height: result.image.height, mimeType: result.image.mimeType}}:{})});
+				runtime=await app.InspectRuntime({});
 			}
 			catch (error) {
 				reports.push({action: action.name, status: 'error', result: error instanceof Error?error.message:String(error)});
 			}
 		}
 		if (reports.length||!answer) {
-			let response=await this.GenerateText(`${question}\nActual action results:\n${reports.map(JSON.stringify).join('\n')}\nGive the user your final answer based on these results, without requesting another action or outputting control JSON.`, {systemInstruction: 'Answer in the user\'s language. Explain failures accurately.'});
+			let response=await this.GenerateText(`${question()}\nActual action results:\n${reports.map(JSON.stringify).join('\n')}\nGive the user your final answer based on these results, without requesting another action or outputting control JSON.`, {systemInstruction: 'Answer in the user\'s language. State only actions confirmed successful by the App and explain failures accurately.'});
 			answer=response.text?.trim();
 		}
 		if (!answer) throw new Error('The model returned an empty answer.');
