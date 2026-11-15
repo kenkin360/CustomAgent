@@ -465,18 +465,19 @@ var CustomAgent=Function.extend(React.Component, function () {
 				}
 				return item;
 			});
-			if (state.isConsulting&&state.messages.at(-1)?.sender==='user') {
+			let pendingIndex=state.isConsulting?state.messages.findLastIndex((message)=>message.sender==='user'):-1;
+			if (pendingIndex>=0) {
 				let thinking=document.createElement('div');
 				thinking.className='ca-thinking';
 				thinking.setAttribute('role', 'status');
 				thinking.setAttribute('aria-live', 'polite');
 				thinking.textContent='正在理解要求並處理本地操作…';
-				items.push(thinking);
+				items.splice(pendingIndex+1, 0, thinking);
 			}
 			list.replaceChildren(...items);
 			this.m_lastMessages=state.messages;
 			this.m_lastConsulting=state.isConsulting;
-			this.Node('messages').scrollTop=this.Node('messages').scrollHeight;
+			(list.querySelector('.ca-thinking')||list.lastElementChild)?.scrollIntoView({block: 'nearest'});
 		}
 		if (state.history!==this.m_lastHistory) {
 			let area=this.Node('history');
@@ -494,7 +495,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 		this.Node('history-count').textContent=state.history.length;
 		for (let button of this.Node('history').children) button.classList.toggle('ca-selected', button.dataset.version===state.activeImage?.id);
-		if (state.isConsulting) this.Node('messages').scrollTop=this.Node('messages').scrollHeight;
 	};
 
 	_['public'].Send=async function (text) {
