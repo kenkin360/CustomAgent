@@ -114,8 +114,8 @@ ${runtime.message}
 需要操作時，在答覆最後附一個 json 程式碼區塊，包含 {"attemptPlan":[{"action":"操作名稱","attempts":1,"reason":"目的與重試條件"}],"localAction":{"name":"操作名稱","arguments":{}}}。不需要操作時可直接以一般文字答覆。App 每次只執行一項操作，並將真實結果送回；依結果繼續、調整或停止。不必固定重試次數，但不要重複已成功的操作。收到成功結果前不得宣稱已完成。
 readCompiledSource 空參數列出啟動時已完整拆解的固定 host 檔案，{file} 取得完整原碼；readRemoteSource 空參數列出 Bundle.Config 等遠端來源，{name} 可重新取得其內容；readInstalledSource 空參數列出已安裝模組，{name} 取得安裝時保留的完整原碼，遠端安裝者可重新取得。inspectRuntime 檢查現有函數、模組及原碼入口。不要聲稱讀過尚未透過操作取得的原碼。
 loadModule 接收獨立的 JavaScript 程式碼或遠端腳本 URL。需要載入時，先輸出 javascript 程式碼區塊（原碼）或 text 程式碼區塊（URL），再於答覆最後輸出操作控制 JSON，其 localAction 為 {"name":"loadModule","arguments":{"name":"模組名稱"}}，並在 attemptPlan 列出 loadModule。自行撰寫類型時，以頂層 var 和 Function.extend(Base, factory) 宣告，將建構子、方法及靜態成員寫在類別定義內；需要完整範例時，可透過 readInstalledSource 查看 DrawRectangle 原碼。可呼叫的模組提供靜態 Run。
-直接以模組名稱作為操作名稱呼叫其 Run；rollback 撤銷上一項模組安裝，不恢復 UI；resetConversation 清空對話。需要實作新功能時可先讀程式碼，再撰寫並載入模組；不要以不存在的功能已預載為由拒絕。
-可用模組可使用瀏覽器標準 API，操作目前影像時，模組的 Run 收到參數與 {image}，回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面；會改動 UI 的模組應自行提供可呼叫的清理函數，rollback 不代替模組清理 UI。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。不要假設原始 App 檔案可被本次 runtime 修改永久覆寫。
+直接以模組名稱作為操作名稱呼叫其 Run；rollback 撤銷上一項模組安裝；resetConversation 清空對話。需要實作新功能時可先讀程式碼，再撰寫並載入模組；不要以不存在的功能已預載為由拒絕。
+可用模組可使用瀏覽器標準 API，操作目前影像時，模組的 Run 收到參數與 {image}，回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。不要假設原始 App 檔案可被本次 runtime 修改永久覆寫。
 若有待使用者確認的生成修改，可於 JSON 加入 accumulatedChanges、suggestedPrompt、aspectRatio；已完成的本地操作不得當作待生成修改。操作結果與錯誤由 App 回傳；答覆使用者時說明真實結果，不展示控制 JSON 或原始工具輸出，除非使用者要求查看。
 `;
 	};
