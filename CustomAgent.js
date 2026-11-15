@@ -228,10 +228,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 			if (descriptor) Object.defineProperty(target, name, descriptor);
 			else delete target[name];
 		};
+		$this.RestoreGlobal(installation.Name, installation.PreviousGlobal);
 		restore(this.GetRuntime().Modules, installation.Name, installation.PreviousModule);
 		restore($this.m_installedSources, installation.Name, installation.PreviousSource);
 		$this.m_versions.pop();
-		return `Restored the previous module registration. ${$this.m_versions.length} earlier installations remain. UI changes made by the module require its own cleanup.`;
+		return `Restored the previous module definition and registration. ${$this.m_versions.length} earlier installations remain. UI changes made by the module require its own cleanup.`;
 	};
 
 	_['public'].Initialize=function () {
@@ -248,12 +249,18 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return $this.m_startup;
 	};
 
-	_['private'].RegisterModule=function (name, value, source, remote, track) {
+	_['private'].RestoreGlobal=function (name, descriptor) {
+		if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+		else if (!delete globalThis[name]) globalThis[name]=undefined;
+	};
+
+	_['private'].RegisterModule=function (name, value, source, remote, track, previousGlobal) {
 		if (value==null) throw new Error(name+' did not expose a module value.');
 		let runtime=this.GetRuntime();
 		if (value.Run!==undefined&&typeof value.Run!=='function') throw new Error(name+' has an invalid Run method.');
 		let installation={
 			Name: name
+			, PreviousGlobal: previousGlobal
 			, PreviousModule: Object.getOwnPropertyDescriptor(runtime.Modules, name)
 			, PreviousSource: Object.getOwnPropertyDescriptor(this.m_installedSources, name)
 		};
@@ -317,12 +324,16 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (typeof source!=='string'||!source.trim()) throw new Error('Provide module source or a script URL.');
 		if (typeof Type!=='function'||!(Type.prototype instanceof Resource)) throw new Error('Provide a Resource type for the module.');
 		let remote=Type===Resource.Module||Type.prototype instanceof Resource.Module;
-		if ($this.GetRuntime().Modules[name]) {
-			if (remote) return {message: name+' is already loaded.'};
-			throw new Error('Use a new module name for updated code.');
+		if (remote&&$this.GetRuntime().Modules[name]) return {message: name+' is already loaded.'};
+		let previousGlobal=Object.getOwnPropertyDescriptor(globalThis, name);
+		try {
+			let value=await new Type(name, source, readyMember);
+			return $this.RegisterModule(name, value, source, remote, track, previousGlobal);
 		}
-		let value=await new Type(name, source, readyMember);
-		return $this.RegisterModule(name, value, source, remote, track);
+		catch (error) {
+			$this.RestoreGlobal(name, previousGlobal);
+			throw error;
+		}
 	};
 
 	_['private'].ExecuteAction=async function (action, image, track=true, source, Type) {
