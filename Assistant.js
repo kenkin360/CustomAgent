@@ -166,7 +166,7 @@ ${question()}
 Current action plan: ${JSON.stringify(plan)}
 Actual action results:
 ${reports.map(JSON.stringify).join('\n')}
-Choose the next action, revise the plan, or give a final answer. Do not repeat successful actions or claim failed actions succeeded.
+Choose the next action, revise the plan, or give a final answer. If a module failed to load, use its reported error to rewrite the source before retrying; do not repeat the same failed source. Do not repeat successful actions or claim failed actions succeeded.
 `:question();
 
 			let options={systemInstruction: $this.Instruction(runtime)};
