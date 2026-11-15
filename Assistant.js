@@ -23,14 +23,23 @@ var Assistant=Function.extend(Object, function () {
 	_['private'].Welcome=async function () {
 		let $this=_(this);
 		let app=$this.m_app;
+		let setupError='';
+		let capabilities={message: ''};
+		let runtime={message: ''};
+		let source='';
 		try {
 			await app.Initialize();
-			let capabilities=await app.ReadSource({});
-			let runtime=await app.InspectRuntime({});
-			let source='';
+		}
+		catch (error) { setupError=error.message||String(error); }
+		try {
+			capabilities=await app.ReadSource({});
+			runtime=await app.InspectRuntime({});
 			try { source=(await app.ReadSource({file: 'CustomAgent.js', limit: 9000}, app.props.HostSourceUrl)).message; }
 			catch (error) { console.warn('Startup source inspection failed:', error); }
-			let response=await this.GenerateText(`You are running inside this App. Inspect its actual capabilities before introducing yourself.\n${capabilities.message}\n${runtime.message}\n${source}\nInterface locale: ${navigator.language}. Briefly greet the user in the language appropriate for the interface or conversation. Describe only capabilities verified above.`, {
+		}
+		catch (error) { setupError=[setupError,error.message||String(error)].filter(Boolean).join('; '); }
+		try {
+			let response=await this.GenerateText(`You are running inside this App. Inspect its actual capabilities before introducing yourself.\n${capabilities.message}\n${runtime.message}\n${source}\nStartup result: ${setupError||'success'}\nInterface locale: ${navigator.language}. Briefly greet the user in the language appropriate for the interface or conversation. Describe only capabilities verified above. If startup failed, explain the actual failure.`, {
 				systemInstruction: 'You are the assistant inside this App. Reply to the user naturally in the appropriate language. Do not claim an action occurred unless the App reported it.'
 			});
 			if (response.text?.trim()&&!app.GetState().messages.length) app.Reply(response.text.trim());
@@ -92,7 +101,7 @@ var Assistant=Function.extend(Object, function () {
 		let runtime=await app.InspectRuntime({});
 		for (;;) {
 			let request=reports.length?`${question}\nCurrent action plan: ${JSON.stringify(plan)}\nActual action results:\n${reports.map(JSON.stringify).join('\n')}\nChoose the next action, revise the plan, or give a final answer. Do not repeat successful actions or claim failed actions succeeded.`:question;
-			let options={systemInstruction: `You are the assistant running in this App. Actual capabilities: ${runtime.message}\nYou may discuss freely. Only the user's Generate button starts image generation. To request a local operation, append one final fenced json block with {"attemptPlan":[{"action":"name","attempts":1,"reason":"reason"}],"localAction":{"name":"name","arguments":{}}}. If no operation is needed use {"localAction":null}. The App executes one action and returns its actual result; decide what to do next after reading it. readAppSource with empty arguments lists files; use it to inspect implementation whenever needed. installCode accepts {code}, whose JavaScript module default function receives AppRuntime. AppRuntime.UI is this App. Local operations that completed are not pending image generation changes. Optional JSON fields: accumulatedChanges, suggestedPrompt, aspectRatio. Answer naturally in the user's language. Never claim unreported success or show control JSON unless asked.`};
+			let options={systemInstruction: `You are the assistant running in this App. Actual capabilities: ${runtime.message}\nYou may discuss freely. Only the user's Generate button starts image generation. To request a local operation, append one final fenced json block with {"attemptPlan":[{"action":"name","attempts":1,"reason":"reason"}],"localAction":{"name":"name","arguments":{}}}. If no operation is needed use {"localAction":null}. The App executes one action and returns its actual result; decide what to do next after reading it. readAppSource with empty arguments lists files; use it to inspect implementation whenever needed. loadModule accepts {name,specifier} for an external classic script or {name,code} for new JavaScript. In either case the script declares exactly one top-level var with that name whose value is a Function.extend(Extension, ...) class; its constructor receives AppRuntime and registers functions or mounts UI. Do not use import, export, or explicit globalThis assignment in this class. Use a new class name for each update; it may replace an existing runtime function. AppRuntime.UI is this App. Local operations that completed are not pending image generation changes. Optional JSON fields: accumulatedChanges, suggestedPrompt, aspectRatio. Answer naturally in the user's language. Never claim unreported success or show control JSON unless asked.`};
 			if (image) options.images=[{base64: image.base64, mimeType: image.mimeType}];
 			let response=await this.GenerateText(request, options);
 			let control=$this.ReadControl(response.text);
@@ -113,7 +122,12 @@ var Assistant=Function.extend(Object, function () {
 			}
 			try {
 				let result=await app.RunAction(action);
-				if (result.conversationReset) return;
+				if (result.conversationReset) {
+					let fresh=await this.GenerateText('The App has cleared the conversation. Greet the user naturally in the language of their request. Do not refer to earlier conversation.', {systemInstruction: 'Reply naturally to the user. Do not output control JSON.'});
+					if (!fresh.text?.trim()) throw new Error('The model returned an empty answer.');
+					app.Reply(fresh.text.trim());
+					return;
+				}
 				if (result.image) { image=result.image; edited=result.image; }
 				reports.push({action: action.name, status: 'success', result: result.message});
 			}
@@ -121,7 +135,7 @@ var Assistant=Function.extend(Object, function () {
 				reports.push({action: action.name, status: 'error', result: error instanceof Error?error.message:String(error)});
 			}
 		}
-		if (!answer||reports.some((item)=>answer===item.result||answer===`${item.action}: ${item.result}`)) {
+		if (reports.length||!answer) {
 			let response=await this.GenerateText(`${question}\nActual action results:\n${reports.map(JSON.stringify).join('\n')}\nGive the user your final answer based on these results, without requesting another action or outputting control JSON.`, {systemInstruction: 'Answer in the user\'s language. Explain failures accurately.'});
 			answer=response.text?.trim();
 		}

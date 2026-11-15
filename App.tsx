@@ -2,6 +2,7 @@ import './Function.extend.js';
 import React from 'react';
 import { Flow } from 'flow-sdk';
 import { Bundle } from './Bundle.js';
+import { Resource } from './Resource.js';
 
 var App=Function.extend(React.Component, function () {
 	var _=this(App);
@@ -19,7 +20,7 @@ var App=Function.extend(React.Component, function () {
 	}
 
 	_['public'].componentDidMount=function () {
-		Object.assign(globalThis, {React, Flow});
+		Object.assign(globalThis, {React, Flow, App, Bundle, Resource});
 		_(this).Load(this);
 	};
 

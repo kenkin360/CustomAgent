@@ -24,9 +24,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_handler=null;
 		$this.m_messageListener=null;
 		$this.m_eventListener=null;
-		$this.m_installing=false;
 		$this.m_startup=null;
-		$this.m_sources=props.SourceFiles||[];
+		$this.m_sources=[...(props.SourceFiles||[]), ['DrawingActions', Bundle.CustomAgent('DrawingActions.js')], ['UpscaleCode', Bundle.CustomAgent('UpscaleCode.js')]];
 		$this.m_assistant=null;
 		$this.m_images=new ImageService(Flow);
 		$this.m_lastMessages=null;
@@ -164,10 +163,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].PickMedia=function () { return this.SelectMedia(); };
 	_['public'].RollbackCode=function () { return this.Rollback(); };
 
-	_['public'].RunAction=async function (action) {
+	_['public'].RunAction=async function (action, track=true) {
 		let $this=_(this);
+		if (action.name==='drawRectangle'||action.name==='callRuntime') await $this.m_startup;
 		let image=$this.m_state.activeImage;
-		let result=await $this.ExecuteAction(action, image, this.props.HostSourceUrl);
+		let result=await $this.ExecuteAction(action, image, this.props.HostSourceUrl, track);
 		if (result.image) $this.SetValues({activeImage: result.image, history: [result.image, ...$this.m_state.history]});
 		return result;
 	};
@@ -180,7 +180,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let runtime=globalThis.AppRuntime||=Object.create(null);
 		runtime.Modules||=Object.create(null);
 		let owner=_(this).m_owner;
-		if (runtime.UI!==owner) runtime.LoadModule=(args)=>owner.LoadModule(args);
 		runtime.UI=owner;
 		return runtime;
 	};
@@ -232,41 +231,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return `Restored the previous runtime code version. ${$this.m_versions.length} earlier versions remain.`;
 	};
 
-	_['public'].InstallCode=async function (args, track=true) {
-		if (typeof args?.code!=='string'||!args.code.trim()||args.code.length>50000) {
-			throw new Error('Provide JavaScript module code of at most 50000 characters.');
-		}
-		let $this=_(this);
-		if ($this.m_installing) throw new Error('Another runtime installation is in progress.');
-		let runtime=this.GetRuntime();
-		let snapshot=$this.Capture();
-		let before={...runtime};
-		$this.m_installing=true;
-		try {
-			let url=`data:text/javascript;charset=utf-8,${encodeURIComponent(args.code)}#${Date.now()}_${Math.random()}`;
-			let module=await import(url);
-			if (typeof module.default==='function') await module.default(runtime);
-			let names=this.GetNames();
-			let changed=names.filter((name)=>runtime[name]!==before[name]);
-			if (track) $this.m_versions.push(snapshot);
-			return {message: `Code loaded in the current App runtime. Registered functions: ${changed.join(', ')||'(none)'}. Available functions: ${names.join(', ')||'(none)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${$this.m_versions.length}.`};
-		}
-		catch (error) {
-			try { $this.Restore(snapshot); }
-			catch (restoreError) { throw new Error(`Installation failed: ${String(error)}. Recovery failed: ${String(restoreError)}`); }
-			throw error;
-		}
-		finally {
-			$this.m_installing=false;
-		}
-	};
-
 	_['public'].Initialize=function () {
 		let $this=_(this);
 		if (!$this.m_startup) {
 			$this.m_startup=(async ()=>{
-				await this.InstallCode({code: DrawingCode.Code}, false);
-				await this.InstallCode({code: UpscaleCode.Code}, false);
+				await this.RunAction({name: 'loadModule', arguments: {name: 'DrawingActions', specifier: Bundle.CustomAgent('DrawingActions.js')}}, false);
+				await this.RunAction({name: 'loadModule', arguments: {name: 'UpscaleCode', specifier: Bundle.CustomAgent('UpscaleCode.js')}}, false);
 			})().catch((error)=>{
 				$this.m_startup=null;
 				throw error;
@@ -275,41 +245,22 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return $this.m_startup;
 	};
 
-	_['public'].LoadModule=async function (args) {
-		if (typeof args?.specifier!=='string'||typeof args?.name!=='string'||!/^[A-Za-z_$][\w$]*$/.test(args.name)) {
-			throw new Error('Provide an esm.sh specifier and a module name.');
+	_['private'].RegisterExtension=function (name, Type, track) {
+		if (typeof Type!=='function'||!(Type.prototype instanceof Extension)) throw new Error(name+' must extend Extension.');
+		let runtime=this.GetRuntime();
+		let snapshot=this.Capture();
+		let before={...runtime};
+		try {
+			let instance=new Type(runtime);
+			runtime.Modules[name]=instance;
+			let changed=this.GetNames().filter((key)=>runtime[key]!==before[key]);
+			if (track) this.m_versions.push(snapshot);
+			return {message: `${name} loaded. Registered functions: ${changed.join(', ')||'(none)'}. Reversible versions: ${this.m_versions.length}.`};
 		}
-		let url=new URL(args.specifier.startsWith('https://')?args.specifier:`https://esm.sh/${args.specifier.replace(/^\/+/, '')}`);
-		if (url.origin!=='https://esm.sh') throw new Error('Only esm.sh module URLs are supported.');
-		let modules=this.GetRuntime().Modules;
-		if (modules[args.name]) return {message: `${args.name} is already loaded from esm.sh.`};
-		if (url.searchParams.has('raw')) {
-			let timeout=Number.isFinite(args.timeoutMs)?Math.max(1000, Math.min(60000, args.timeoutMs)):30000;
-			await new Promise((resolve, reject)=>{
-				let script=document.createElement('script');
-				let timer=setTimeout(()=>{script.remove();reject(new Error('Timed out loading '+url.href));}, timeout);
-				script.onload=()=>{clearTimeout(timer);resolve();};
-				script.onerror=()=>{clearTimeout(timer);script.remove();reject(new Error('Failed to load '+url.href));};
-				script.src=url.href;
-				(document.head||document.body||document.documentElement).appendChild(script);
-			});
-			let value=args.globalName?globalThis[args.globalName]:true;
-			if (args.globalName) {
-				let deadline=Date.now()+timeout;
-				while (Date.now()<deadline) {
-					value=globalThis[args.globalName];
-					if (value&&typeof value.then==='function') value=await value;
-					if (value&&(!args.readyMember||value[args.readyMember])) break;
-					await new Promise((resolve)=>setTimeout(resolve, 50));
-				}
-				if (!value||args.readyMember&&!value[args.readyMember]) throw new Error('Timed out waiting for '+args.globalName);
-			}
-			modules[args.name]=value;
-			return {message: `${args.name} loaded as a raw script from ${url.href}.`};
+		catch (error) {
+			this.Restore(snapshot);
+			throw error;
 		}
-		let value=await import(url.href);
-		modules[args.name]=value;
-		return {message: `${args.name} loaded as an ES module from ${url.href}; exports: ${Object.keys(value).slice(0, 40).join(', ')||'(none)'}.`};
 	};
 
 	_['private'].SourceFiles=function (url) {
@@ -354,7 +305,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return {message: `${args.file} (${offset}-${Math.min(source.length,offset+limit)} of ${source.length} characters):\n${source.slice(offset,offset+limit)}`};
 	};
 
-	_['private'].ExecuteAction=async function (action, image, sourceUrl) {
+	_['private'].ExecuteAction=async function (action, image, sourceUrl, track=true) {
 		if (!action?.arguments||typeof action.arguments!=='object'||Array.isArray(action.arguments)) throw new Error('Action arguments must be an object.');
 		let args=action.arguments;
 		switch (action.name) {
@@ -365,10 +316,18 @@ var CustomAgent=Function.extend(React.Component, function () {
 					if (typeof runtime[args.name]!=='function') throw new Error('Runtime function not found: '+args.name);
 					return {message: `${args.name}: ${String(runtime[args.name]).slice(0,12000)}`};
 				}
-				return {message: `AppRuntime functions: ${this.GetNames().join(', ')||'(none)'}. Loaded modules: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${_(this).m_versions.length}. Built-in actions: drawRectangle, readAppSource, inspectRuntime, installCode, loadModule, callRuntime, rollbackCode, resetConversation.`};
+				return {message: `AppRuntime functions: ${this.GetNames().join(', ')||'(none)'}. Loaded extensions: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${_(this).m_versions.length}. Built-in actions: drawRectangle, readAppSource, inspectRuntime, loadModule, callRuntime, rollbackCode, resetConversation.`};
 			}
-			case 'installCode': return this.InstallCode(args);
-			case 'loadModule': return this.LoadModule(args);
+			case 'loadModule': {
+				if (typeof args.name!=='string'||!/^[A-Za-z_$][\w$]*$/.test(args.name)) throw new Error('Provide an extension class name.');
+				let url=typeof args.code==='string'&&args.code.trim()
+					?`data:text/javascript;charset=utf-8,${encodeURIComponent(args.code)}`
+					:args.specifier;
+				if (typeof url!=='string'||!url) throw new Error('Provide extension code or a script URL.');
+				if (this.GetRuntime().Modules[args.name]&&!args.code) return {message: args.name+' is already loaded.'};
+				let Type=await new Resource.Module(args.name, url);
+				return this.RegisterExtension(args.name, Type, track);
+			}
 			case 'drawRectangle':
 			case 'callRuntime': {
 				let name=action.name==='drawRectangle'?'drawRectangle':args.name;
@@ -615,7 +574,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['private'].m_handler=null;
 	_['private'].m_messageListener=null;
 	_['private'].m_eventListener=null;
-	_['private'].m_installing=false;
 	_['private'].m_startup=null;
 	_['private'].m_sources=null;
 	_['private'].m_images=null;
