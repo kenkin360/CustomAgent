@@ -32,7 +32,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			, inspectRuntime: (args)=>this.InspectRuntime(args)
 			, loadModule: (args, context)=>{
 				if (Object.prototype.hasOwnProperty.call(args, 'code')||Object.prototype.hasOwnProperty.call(args, 'specifier')) throw new Error('Pass module source separately from action arguments.');
-				return this.LoadModule(context.source, {name: args.name, readyMember: args.readyMember, track: context.track});
+				return this.LoadModule(context.source, {name: args.name, Type: context.Type, readyMember: args.readyMember, track: context.track});
 			}
 			, rollback: ()=>({message: this.Rollback()})
 			, resetConversation: ()=>{
@@ -184,11 +184,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.SetValues({isConsulting: false});
 	};
 	_['public'].PickMedia=function () { return this.SelectMedia(); };
-	_['public'].RunAction=async function (action, track=true, source) {
+	_['public'].RunAction=async function (action, track=true, source, Type) {
 		let $this=_(this);
 		await $this.m_startup;
 		let image=$this.m_state.activeImage;
-		let result=await $this.ExecuteAction(action, image, track, source);
+		let result=await $this.ExecuteAction(action, image, track, source, Type);
 		if (result.image) $this.SetValues({activeImage: result.image, history: [result.image, ...$this.m_state.history]});
 		return result;
 	};
@@ -238,8 +238,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		if (!$this.m_startup) {
 			$this.m_startup=(async ()=>{
-				await this.LoadModule(Bundle.CustomAgent('DrawRectangle.js'), {name: 'DrawRectangle', track: false});
-				await this.LoadModule(Bundle.CustomAgent('Upscale.js'), {name: 'Upscale', track: false});
+				await this.LoadModule(Bundle.CustomAgent('DrawRectangle.js'), {name: 'DrawRectangle', Type: Resource.Module, track: false});
+				await this.LoadModule(Bundle.CustomAgent('Upscale.js'), {name: 'Upscale', Type: Resource.Module, track: false});
 			})().catch((error)=>{
 				$this.m_startup=null;
 				throw error;
@@ -312,24 +312,22 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].LoadModule=async function (source, options={}) {
 		let $this=_(this);
-		let {name, readyMember, track=true}=options;
+		let {name, Type, readyMember, track=true}=options;
 		if (typeof name!=='string'||!/^[A-Za-z_$][\w$]*$/.test(name)) throw new Error('Provide a module name.');
 		if (typeof source!=='string'||!source.trim()) throw new Error('Provide module source or a script URL.');
-		let remote=/^https?:\/\//i.test(source.trim());
-		if ($this.GetRuntime().Modules[name]&&remote) return {message: name+' is already loaded.'};
-		if ($this.GetRuntime().Modules[name]&&!remote) throw new Error('Use a new module name for updated code.');
-		let value=remote
-			?await new Resource.Module(name, source.trim(), readyMember)
-			:await new Resource.Inline(name, source, readyMember);
+		if (typeof Type!=='function'||!(Type.prototype instanceof Resource)) throw new Error('Provide a Resource type for the module.');
+		if ($this.GetRuntime().Modules[name]) throw new Error('Use a new module name for updated code.');
+		let value=await new Type(name, source, readyMember);
+		let remote=Type===Resource.Module||Type.prototype instanceof Resource.Module;
 		return $this.RegisterModule(name, value, source, remote, track);
 	};
 
-	_['private'].ExecuteAction=async function (action, image, track=true, source) {
+	_['private'].ExecuteAction=async function (action, image, track=true, source, Type) {
 		if (!action?.arguments||typeof action.arguments!=='object'||Array.isArray(action.arguments)) throw new Error('Action arguments must be an object.');
 		let args=action.arguments;
 		let callback=_(this).m_actions[action.name]||this.GetRuntime().Modules[action.name]?.Run;
 		if (typeof callback!=='function') throw new Error('Runtime function not found: '+String(action.name));
-		let value=await callback(args, {image, track, source});
+		let value=await callback(args, {image, track, source, Type});
 		let output=value&&typeof value==='object'&&'image' in value?value.image:value;
 		if (output&&typeof output.base64==='string'&&/^image\/(png|jpeg|webp)$/.test(output.mimeType)) {
 			let dimensions=await _(this).m_images.GetDimensions(output);
