@@ -6,7 +6,7 @@ var Assistant=Function.extend(Object, function () {
 		_['base'].apply(this, arguments);
 		let $this=_(this);
 		$this.m_app=app;
-		$this.m_detach=app.SubscribeMessage((message)=>$this.HandleMessage(message));
+		$this.m_detach=app.SubscribeMessage((message, turn)=>$this.HandleMessage(message, turn));
 		$this.m_detachEvent=app.SubscribeEvent((event, details, image)=>$this.Report(event, details, image));
 		$this.m_ready=$this.Welcome();
 	}
@@ -24,26 +24,19 @@ var Assistant=Function.extend(Object, function () {
 		let $this=_(this);
 		let app=$this.m_app;
 		let setupError='';
-		let capabilities={message: ''};
 		let runtime={message: ''};
-		let source='';
 		try {
 			await app.Initialize();
 		}
 		catch (error) { setupError=error.message||String(error); }
 		try {
-			capabilities=await app.ReadSource({});
 			runtime=await app.InspectRuntime({});
-			try { source=(await app.ReadSource({file: 'CustomAgent.js', limit: 9000}, app.props.HostSourceUrl)).message; }
-			catch (error) { console.warn('Startup source inspection failed:', error); }
 		}
 		catch (error) { setupError=[setupError,error.message||String(error)].filter(Boolean).join('; '); }
 		try {
-			let response=await this.GenerateText('.', {systemInstruction: `
-你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，僅描述確實可用的能力。若啟動失敗，說明真實錯誤。請依瀏覽器語系或使用者對話語言回覆；無法判斷時使用英文。
-${capabilities.message}
+			let response=await this.GenerateText('', {systemInstruction: `
+你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，僅描述確實可用的能力。這裡只有原碼檔案清單與執行狀態；需要原碼內容時再使用對應讀取操作。若啟動失敗，說明真實錯誤。請依瀏覽器語系或使用者對話語言回覆；無法判斷時使用英文。
 ${runtime.message}
-${source}
 啟動結果：${setupError||'success'}
 瀏覽器語系：${navigator.language}
 不可聲稱尚未執行的操作已經成功。不要輸出操作控制 JSON。
@@ -62,16 +55,27 @@ ${source}
 			try {
 				let data=JSON.parse(block[1]);
 				if (!data||!Object.prototype.hasOwnProperty.call(data, 'localAction')) continue;
-				return {Data: data, Text: (value.slice(0, block.index)+value.slice(block.index+block[0].length)).trim()};
+				let remaining=(value.slice(0, block.index)+value.slice(block.index+block[0].length)).trim();
+				let source=null;
+				if (data.localAction?.name==='loadModule') {
+					let sourceBlocks=[...remaining.matchAll(/(?:^|\n)```(?:javascript|js|text|url)\s*\n([\s\S]*?)\n```(?=\s*(?:\n|$))/gi)];
+					let last=sourceBlocks.at(-1);
+					if (last) {
+						source=last[1];
+						remaining=(remaining.slice(0,last.index)+remaining.slice(last.index+last[0].length)).trim();
+					}
+				}
+				return {Data: data, Text: remaining, Source: source};
 			}
 			catch (error) { console.warn('Invalid conversation control', error); }
 		}
 		try {
 			let data=JSON.parse(String(value).trim());
-			if (data&&Object.prototype.hasOwnProperty.call(data, 'localAction')) return {Data: data, Text: ''};
+			if (data&&Object.prototype.hasOwnProperty.call(data, 'localAction')) return {Data: data, Text: '', Source: null};
 		}
 		catch (error) { /* A normal answer need not be JSON. */ }
-		return {Data: null, Text: String(value).trim()};
+		if (/(?:^|\n)```json\s*\n/i.test(value)&&/(?:^|\n)```(?:javascript|js)\s*\n/i.test(value)) throw new Error('Module code was returned with an invalid action decision; nothing was installed.');
+		return {Data: null, Text: String(value).trim(), Source: null};
 	};
 
 	_['private'].Instruction=function (runtime) {
@@ -79,7 +83,9 @@ ${source}
 你是此 App 的 Assistant。你可以討論需求，也可以請 App 執行本地操作；只有使用者按下生成按鈕才生成影像。請依使用者本輪使用的語言自然答覆，無法判斷時參考對話或瀏覽器語系，仍無法判斷時使用英文。
 實際能力：${runtime.message}
 需要操作時，在答覆最後附一個 json 程式碼區塊，包含 {"attemptPlan":[{"action":"操作名稱","attempts":1,"reason":"目的與重試條件"}],"localAction":{"name":"操作名稱","arguments":{}}}。不需要操作時可直接以一般文字答覆。App 每次只執行一項操作，並將真實結果送回；依結果繼續、調整或停止。不必固定重試次數，但不要重複已成功的操作。收到成功結果前不得宣稱已完成。
-readAppSource 空參數可列出程式碼檔案，{file,query} 可查閱內容；inspectRuntime 可檢查現有函數與模組。loadModule 接受 {name,specifier} 或 {name,code}，由 Resource.Module 載入以該名稱公開的 JavaScript 值；不要求繼承、建立實例或使用 export/globalThis 賦值。若載入值有 ActionName 與靜態 Run 函數，App 會登記為可呼叫的 runtime 函數；模組自身亦可透過 AppRuntime.UI 使用介面 API。callRuntime 接受 {name,arguments}；rollbackCode 可回復上一版 runtime，resetConversation 可清空對話。需要實作新功能時可先讀程式碼，再撰寫並載入模組；不要以不存在的功能已預載為由拒絕。
+readCompiledSource 空參數列出啟動時已完整拆解的固定 host 檔案，{file} 取得完整原碼；readRemoteSource 空參數列出 Bundle.Config 等遠端來源，{name} 可重新取得其內容；readInstalledSource 空參數列出已安裝模組，{name} 取得安裝時保留的完整原碼，遠端安裝者可重新取得。inspectRuntime 檢查現有函數、模組及原碼入口。不要聲稱讀過尚未透過操作取得的原碼。
+loadModule 使用程式碼或網址作為獨立的原始文字，不放進 JSON。請先輸出一個 javascript 程式碼區塊（新模組原碼），或一個 text 程式碼區塊（遠端腳本 URL）；接著在答覆最後輸出操作控制 JSON，其 localAction 為 {"name":"loadModule","arguments":{"name":"模組名稱"}}，並在 attemptPlan 列出 loadModule。App 會將前面的原文作為 LoadModule(source, options) 的第一參數，由 Resource.Module 載入以該名稱公開的 JavaScript 值；不要求繼承、建立實例或使用 export/globalThis 賦值。若載入值有 ActionName 與靜態 Run 函數，App 登記為可呼叫的 runtime 函數。更新程式請用新的模組名稱。不得把原始碼放進 arguments.code。
+callRuntime 接受 {name,arguments}；rollbackCode 僅恢復上一項安裝的模組與函數登記，不恢復 UI；resetConversation 清空對話。需要實作新功能時可先讀程式碼，再撰寫並載入模組；不要以不存在的功能已預載為由拒絕。
 可用模組可使用瀏覽器標準 API，操作目前影像時，runtime 函數收到參數與 {image}，回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。不要假設原始 App 檔案可被本次 runtime 修改永久覆寫。
 若有待使用者確認的生成修改，可於 JSON 加入 accumulatedChanges、suggestedPrompt、aspectRatio；已完成的本地操作不得當作待生成修改。操作結果與錯誤由 App 回傳；答覆使用者時說明真實結果，不展示控制 JSON 或原始工具輸出，除非使用者要求查看。
 `;
@@ -148,10 +154,10 @@ Choose the next action, revise the plan, or give a final answer. Do not repeat s
 			}
 			try {
 				if (turn?.cancelled) return;
-				let result=await app.RunAction(action);
+				let result=await app.RunAction(action, true, control.Source);
 				if (turn?.cancelled) return;
 				if (result.conversationReset) {
-					let fresh=await this.GenerateText('.', {systemInstruction: `
+					let fresh=await this.GenerateText('', {systemInstruction: `
 App 已清空對話。以使用者這次要求的語言自然回覆，無須提及先前對話。不要輸出操作控制 JSON。
 `});
 					if (turn?.cancelled) return;
