@@ -29,6 +29,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_assistant=null;
 		$this.m_images=new ImageService(Flow);
 		$this.m_lastMessages=null;
+		$this.m_lastConsulting=null;
 		$this.m_lastHistory=null;
 	}
 
@@ -426,7 +427,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 		this.Node('empty').style.display=state.activeImage?'none':'block';
 		this.Node('image-ratio').textContent=state.activeImage?.width&&state.activeImage?.height?`${state.activeImage.width} × ${state.activeImage.height}`:'';
 		this.Node('generating').style.display=state.isGenerating?'flex':'none';
-		this.Node('thinking').hidden=!state.isConsulting;
 		let input=this.Node('input');
 		if (input.value!==state.inputText) input.value=state.inputText;
 		this.Node('pending').style.display=state.accumulatedChanges.length?'block':'none';
@@ -435,9 +435,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 		this.Node('pending-list').style.whiteSpace='pre-wrap';
 		this.Node('pending-prompt').textContent=state.generationPrompt||'';
 		for (let button of this.Node('ratios').querySelectorAll('[data-ratio]')) button.classList.toggle('ca-selected', button.dataset.ratio===state.selectedRatio);
-		if (state.messages!==this.m_lastMessages) {
+		if (state.messages!==this.m_lastMessages||state.isConsulting!==this.m_lastConsulting) {
 			let list=this.Node('message-list');
-			list.replaceChildren(...state.messages.map((message)=>{
+			let items=state.messages.map((message)=>{
 				let item=document.createElement('div');
 				item.className=`ca-message ca-${message.sender}`;
 				let time=document.createElement('small');
@@ -464,8 +464,18 @@ var CustomAgent=Function.extend(React.Component, function () {
 					item.appendChild(copy);
 				}
 				return item;
-			}));
+			});
+			if (state.isConsulting&&state.messages.at(-1)?.sender==='user') {
+				let thinking=document.createElement('div');
+				thinking.className='ca-thinking';
+				thinking.setAttribute('role', 'status');
+				thinking.setAttribute('aria-live', 'polite');
+				thinking.textContent='正在理解要求並處理本地操作…';
+				items.push(thinking);
+			}
+			list.replaceChildren(...items);
 			this.m_lastMessages=state.messages;
+			this.m_lastConsulting=state.isConsulting;
 			this.Node('messages').scrollTop=this.Node('messages').scrollHeight;
 		}
 		if (state.history!==this.m_lastHistory) {
@@ -586,6 +596,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['private'].m_sources=null;
 	_['private'].m_images=null;
 	_['private'].m_lastMessages=null;
+	_['private'].m_lastConsulting=null;
 	_['private'].m_lastHistory=null;
 	_['private'].m_click=null;
 	_['private'].m_input=null;
