@@ -1,14 +1,12 @@
-var UpscaleCode=Function.extend(Extensible, function () {
+var UpscaleCode=Function.extend(Object, function () {
 	var _=this(UpscaleCode);
 	UpscaleCode=_[UpscaleCode];
 
-	function UpscaleCode(runtime) {
+	function UpscaleCode() {
 		_['base'].apply(this, arguments);
 		let $this=_(this);
 		$this.m_websr=null;
 		$this.m_weights=null;
-		runtime.upscaleImage=this.Run.bind(this);
-		runtime.upscaleImage.Description='Upscale the current image with Real-ESRGAN. Optional integer pixel arguments: width and height together for exact output dimensions. The full image is fitted without distortion; a differing aspect ratio leaves transparent margins.';
 	}
 
 	_['private'].GetWebSR=async function () {
@@ -116,4 +114,8 @@ var UpscaleCode=Function.extend(Extensible, function () {
 
 	_['private'].m_websr=null;
 	_['private'].m_weights=null;
+	UpscaleCode.ActionName='upscaleImage';
+	UpscaleCode.Default=new UpscaleCode();
+	UpscaleCode.Run=UpscaleCode.Default.Run.bind(UpscaleCode.Default);
+	UpscaleCode.Run.Description='Upscale the current image with Real-ESRGAN. Optional integer pixel arguments: width and height together for exact output dimensions. The full image is fitted without distortion; a differing aspect ratio leaves transparent margins.';
 });
