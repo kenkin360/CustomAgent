@@ -1,6 +1,7 @@
 import './Function.extend.js';
 import React from 'react';
 import { Flow } from 'flow-sdk';
+import * as fabric from 'fabric';
 import { Bundle } from './Bundle.js';
 import { Resource } from './Resource.js';
 
@@ -19,7 +20,7 @@ var App=Function.extend(React.Component, function () {
 	}
 
 	_['public'].componentDidMount=function () {
-		Object.assign(globalThis, {React, Flow, App, Bundle, Resource});
+		Object.assign(globalThis, {React, Flow, fabric, App, Bundle, Resource});
 		_(this).Load(this);
 	};
 
