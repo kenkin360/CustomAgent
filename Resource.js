@@ -24,12 +24,14 @@ var Resource=Function.extend(Promise, function () {
 				, Element: null
 				, Created: false
 				, Finished: false
+				, Loaded: false
 				, Pending: null
 				, Resolved: null
 				, Interval: null
 				, Timeout: null
 				, LoadHandler: null
 				, ErrorHandler: null
+				, EvaluationHandler: null
 				, TimeoutHandler: null
 			};
 		});
@@ -38,6 +40,7 @@ var Resource=Function.extend(Promise, function () {
 	_['protected'].Begin=function (tagName, loadHandler, check, append) {
 		let $this=_(this);
 		let state=$this.m_state;
+		let inlineScript=tagName==='script'&&state.Url.startsWith('data:text/javascript');
 		if (typeof document==='undefined') {
 			$this.Finish(new Error('External resources require a browser environment'));
 			return null;
@@ -45,8 +48,18 @@ var Resource=Function.extend(Promise, function () {
 		state.LoadHandler=loadHandler;
 		state.ErrorHandler=$this.HandleError.bind($this);
 		state.TimeoutHandler=$this.HandleTimeout.bind($this);
-		state.Timeout=setTimeout(state.TimeoutHandler, 15e3);
-		if (check) {
+		if (inlineScript&&typeof window!=='undefined') {
+			state.EvaluationHandler=(event)=>{
+				if (event.filename!==state.Url&&event.filename!==state.Element?.src) return;
+				event.preventDefault();
+				let location=event.lineno?` at ${event.lineno}:${event.colno||1}`:'';
+				let reason=event.error?.message||event.message||'Script evaluation failed';
+				$this.Finish(new Error(`${state.Name}: ${event.error?.name||'Error'}: ${reason}${location}`));
+			};
+			window.addEventListener('error', state.EvaluationHandler);
+		}
+		if (!inlineScript) state.Timeout=setTimeout(state.TimeoutHandler, 15e3);
+		if (check&&!inlineScript) {
 			state.Interval=setInterval(loadHandler, 50);
 			loadHandler();
 		}
@@ -104,6 +117,7 @@ var Resource=Function.extend(Promise, function () {
 		state.Finished=true;
 		clearInterval(state.Interval);
 		clearTimeout(state.Timeout);
+		if (state.EvaluationHandler) window.removeEventListener('error', state.EvaluationHandler);
 		if (state.Element) {
 			state.Element.removeEventListener('load', state.LoadHandler);
 			state.Element.removeEventListener('error', state.ErrorHandler);
@@ -137,8 +151,14 @@ var Resource=Function.extend(Promise, function () {
 
 		_['public'].Start=function () {
 			let $this=_(this);
+			let state=$this.GetState();
 			$this.m_checkHandler=$this.Check.bind($this);
-			$this.Begin('script', $this.m_checkHandler, true, true);
+			let inline=state.Url.startsWith('data:text/javascript');
+			let onLoad=inline?()=>{
+				state.Loaded=true;
+				$this.Check().catch((error)=>$this.Finish(error));
+			}:$this.m_checkHandler;
+			$this.Begin('script', onLoad, !inline, true);
 		};
 
 		_['private'].Check=async function () {
@@ -169,6 +189,9 @@ var Resource=Function.extend(Promise, function () {
 			if ((value)&&((!state.ReadyMember)||(value[state.ReadyMember]))) {
 				globalThis[state.Name]=value;
 				$this.Finish(null, value);
+			}
+			else if (state.Loaded) {
+				$this.Finish(new Error(`${state.Name} did not expose a ready module value.`));
 			}
 		};
 
