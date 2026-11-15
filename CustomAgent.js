@@ -25,7 +25,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_messageListener=null;
 		$this.m_eventListener=null;
 		$this.m_startup=null;
-		$this.m_sources=[...(props.SourceFiles||[]), ['DrawingActions', Bundle.CustomAgent('DrawingActions.js')], ['UpscaleCode', Bundle.CustomAgent('UpscaleCode.js')]];
+		$this.m_sources=[...(props.SourceFiles||[]), ['DrawRectangle', Bundle.CustomAgent('DrawRectangle.js')], ['UpscaleCode', Bundle.CustomAgent('UpscaleCode.js')]];
 		$this.m_assistant=null;
 		$this.m_images=new ImageService(Flow);
 		$this.m_lastMessages=null;
@@ -165,7 +165,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].RunAction=async function (action, track=true) {
 		let $this=_(this);
-		if (action.name==='drawRectangle'||action.name==='callRuntime') await $this.m_startup;
+		if (action.name!=='loadModule') await $this.m_startup;
 		let image=$this.m_state.activeImage;
 		let result=await $this.ExecuteAction(action, image, this.props.HostSourceUrl, track);
 		if (result.image) $this.SetValues({activeImage: result.image, history: [result.image, ...$this.m_state.history]});
@@ -235,7 +235,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		if (!$this.m_startup) {
 			$this.m_startup=(async ()=>{
-				await this.RunAction({name: 'loadModule', arguments: {name: 'DrawingActions', specifier: Bundle.CustomAgent('DrawingActions.js')}}, false);
+				await this.RunAction({name: 'loadModule', arguments: {name: 'DrawRectangle', specifier: Bundle.CustomAgent('DrawRectangle.js')}}, false);
 				await this.RunAction({name: 'loadModule', arguments: {name: 'UpscaleCode', specifier: Bundle.CustomAgent('UpscaleCode.js')}}, false);
 			})().catch((error)=>{
 				$this.m_startup=null;
@@ -246,7 +246,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['private'].RegisterExtension=function (name, Type, track) {
-		if (typeof Type!=='function'||!(Type.prototype instanceof Extension)) throw new Error(name+' must extend Extension.');
+		if (typeof Type!=='function'||!(Type.prototype instanceof Extensible)) throw new Error(name+' must extend Extensible.');
 		let runtime=this.GetRuntime();
 		let snapshot=this.Capture();
 		let before={...runtime};
@@ -316,7 +316,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 					if (typeof runtime[args.name]!=='function') throw new Error('Runtime function not found: '+args.name);
 					return {message: `${args.name}: ${String(runtime[args.name]).slice(0,12000)}`};
 				}
-				return {message: `AppRuntime functions: ${this.GetNames().join(', ')||'(none)'}. Loaded extensions: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${_(this).m_versions.length}. Built-in actions: drawRectangle, readAppSource, inspectRuntime, loadModule, callRuntime, rollbackCode, resetConversation.`};
+				return {message: `AppRuntime functions: ${this.GetNames().join(', ')||'(none)'}. Loaded extensions: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${_(this).m_versions.length}. Built-in actions: readAppSource, inspectRuntime, loadModule, callRuntime, rollbackCode, resetConversation.`};
 			}
 			case 'loadModule': {
 				if (typeof args.name!=='string'||!/^[A-Za-z_$][\w$]*$/.test(args.name)) throw new Error('Provide an extension class name.');
@@ -328,10 +328,13 @@ var CustomAgent=Function.extend(React.Component, function () {
 				let Type=await new Resource.Module(args.name, url);
 				return this.RegisterExtension(args.name, Type, track);
 			}
-			case 'drawRectangle':
-			case 'callRuntime': {
-				let name=action.name==='drawRectangle'?'drawRectangle':args.name;
-				let input=action.name==='drawRectangle'?args:args.arguments??{};
+			case 'rollbackCode': return {message: this.Rollback()};
+			case 'resetConversation':
+				this.ResetConversation();
+				return {message: 'Conversation cleared.', conversationReset: true};
+			default: {
+				let name=action.name==='callRuntime'?args.name:action.name;
+				let input=action.name==='callRuntime'?args.arguments??{}:args;
 				let fn=this.GetRuntime()[name];
 				if (typeof fn!=='function') throw new Error('Runtime function not found: '+String(name));
 				let value=await fn(input, {image});
@@ -348,11 +351,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 				}
 				return {message: `${name}: ${(typeof value==='string'?value:JSON.stringify(value)??'completed').slice(0,12000)}`};
 			}
-			case 'rollbackCode': return {message: this.Rollback()};
-			case 'resetConversation':
-				this.ResetConversation();
-				return {message: 'Conversation cleared.', conversationReset: true};
-			default: throw new Error('Unsupported local action: '+action.name);
 		}
 	};
 

@@ -1,8 +1,8 @@
-var DrawingActions=Function.extend(Extension, function () {
-	var _=this(DrawingActions);
-	DrawingActions=_[DrawingActions];
+var DrawRectangle=Function.extend(Extensible, function () {
+	var _=this(DrawRectangle);
+	DrawRectangle=_[DrawRectangle];
 
-	function DrawingActions(runtime) {
+	function DrawRectangle(runtime) {
 		_['base'].apply(this, arguments);
 		runtime.drawRectangle=this.Run.bind(this);
 	}

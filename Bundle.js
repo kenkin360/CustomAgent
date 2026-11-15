@@ -39,7 +39,7 @@ var Bundle=Function.extend(Function, function () {
 		['CustomAgent', Bundle.CustomAgent('CustomAgent.js')]
 		, ['Assistant', Bundle.CustomAgent('Assistant.js')]
 		, ['ImageService', Bundle.CustomAgent('ImageService.js')]
-		, ['Extension', Bundle.CustomAgent('Extension.js')]
+		, ['Extensible', Bundle.CustomAgent('Extensible.js')]
 		, ['agentTemplate', Bundle.CustomAgent('views/agent.html.js')]
 	];
 });

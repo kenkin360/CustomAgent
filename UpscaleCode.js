@@ -1,4 +1,4 @@
-var UpscaleCode=Function.extend(Extension, function () {
+var UpscaleCode=Function.extend(Extensible, function () {
 	var _=this(UpscaleCode);
 	UpscaleCode=_[UpscaleCode];
 
