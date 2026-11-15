@@ -8,9 +8,28 @@ var ImageService=Function.extend(Object, function () {
 	}
 	ImageService.ModelDisplayName='🍌 Nano Banana 2.1';
 
-	_['public'].Select=async function (ratio) {
+	_['public'].GetDimensions=async function (image) {
+		if (Number.isInteger(image?.width)&&Number.isInteger(image?.height)&&image.width>0&&image.height>0) {
+			return {width: image.width, height: image.height};
+		}
+		let source=new Image();
+		source.src=`data:${image.mimeType};base64,${image.base64}`;
+		await source.decode();
+		if (!source.naturalWidth||!source.naturalHeight) throw new Error('Unable to read image dimensions.');
+		return {width: source.naturalWidth, height: source.naturalHeight};
+	};
+
+	_['public'].GetAspectRatio=function ({width, height}) {
+		let a=width;
+		let b=height;
+		while (b) [a, b]=[b, a%b];
+		return width/a+':'+height/a;
+	};
+
+	_['public'].Select=async function () {
 		let selected=await _(this).m_flow.media.select({filter: 'image'});
 		if (!selected) return null;
+		let dimensions=await this.GetDimensions(selected);
 		return {
 			id: 'img_'+Date.now()
 			, base64: selected.base64
@@ -18,15 +37,17 @@ var ImageService=Function.extend(Object, function () {
 			, mediaId: selected.mediaId
 			, prompt: '從媒體庫匯入的原始影像'
 			, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-			, aspectRatio: ratio
+			, aspectRatio: this.GetAspectRatio(dimensions)
+			, ...dimensions
 			, title: selected.name||'匯入影像'
 		};
 	};
 
-	_['public'].Capture=async function (ratio) {
+	_['public'].Capture=async function () {
 		let flow=_(this).m_flow;
 		let photo=await flow.camera.capture({facingMode: 'user'});
 		if (!photo) return null;
+		let dimensions=await this.GetDimensions(photo);
 		let upload=await flow.upload({
 			base64: photo.base64
 			, mimeType: 'image/png'
@@ -39,7 +60,8 @@ var ImageService=Function.extend(Object, function () {
 			, mediaId: upload.mediaId
 			, prompt: '相機即時拍攝'
 			, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-			, aspectRatio: ratio
+			, aspectRatio: this.GetAspectRatio(dimensions)
+			, ...dimensions
 			, title: '相機拍照'
 		};
 	};
@@ -57,6 +79,7 @@ var ImageService=Function.extend(Object, function () {
 			, aspectRatio: ratio
 			, modelDisplayName: ImageService.ModelDisplayName
 		});
+		let dimensions=await this.GetDimensions(result);
 		return {
 			SourceMediaId: mediaId
 			, Image: {
@@ -66,7 +89,8 @@ var ImageService=Function.extend(Object, function () {
 				, mediaId: result.mediaId
 				, prompt
 				, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-				, aspectRatio: ratio
+				, aspectRatio: this.GetAspectRatio(dimensions)
+				, ...dimensions
 				, title: `修改版本 #${index}`
 			}
 		};

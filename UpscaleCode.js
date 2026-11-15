@@ -8,6 +8,7 @@ var UpscaleCode=Function.extend(Extensible, function () {
 		$this.m_websr=null;
 		$this.m_weights=null;
 		runtime.upscaleImage=this.Run.bind(this);
+		runtime.upscaleImage.Description='Upscale the current image with Real-ESRGAN. Optional integer pixel arguments: width and height together for exact output dimensions. The full image is fitted without distortion; a differing aspect ratio leaves transparent margins.';
 	}
 
 	_['private'].GetWebSR=async function () {
@@ -31,8 +32,13 @@ var UpscaleCode=Function.extend(Extensible, function () {
 		catch (error) { $this.m_weights=null; throw error; }
 	};
 
-	_['public'].Run=async function (args, {image}) {
+	_['public'].Run=async function (args={}, {image}) {
 		if (!image) throw new Error('Load an image first.');
+		let width=args.width;
+		let height=args.height;
+		if ((width!==undefined||height!==undefined)&&(!Number.isSafeInteger(width)||width<1||!Number.isSafeInteger(height)||height<1)) {
+			throw new Error('Provide positive integer width and height in pixels.');
+		}
 		let WebSR=await _(this).GetWebSR();
 		let source=new Image();
 		source.src='data:'+image.mimeType+';base64,'+image.base64;
@@ -83,12 +89,25 @@ var UpscaleCode=Function.extend(Extensible, function () {
 				context.putImageData(result, 0, 0);
 			}
 			else context.drawImage(canvas, 0, 0);
+			if (width&&height&&(width!==output.width||height!==output.height)) {
+				let fitted=document.createElement('canvas');
+				fitted.width=width;
+				fitted.height=height;
+				let surface=fitted.getContext('2d');
+				if (!surface) throw new Error('Target canvas is unavailable.');
+				let scale=Math.min(width/output.width, height/output.height);
+				let drawWidth=output.width*scale;
+				let drawHeight=output.height*scale;
+				surface.imageSmoothingQuality='high';
+				surface.drawImage(output, (width-drawWidth)/2, (height-drawHeight)/2, drawWidth, drawHeight);
+				output=fitted;
+			}
 			return {
 				message: 'Upscaled to '+output.width+' × '+output.height+' with Real-ESRGAN.'
 				, image: {
 					base64: output.toDataURL('image/png').split(',')[1]
 					, mimeType: 'image/png'
-					, title: image.title+' · 4x'
+					, title: image.title+' · '+output.width+'×'+output.height
 				}
 			};
 		}

@@ -84,11 +84,12 @@ var Assistant=Function.extend(Object, function () {
 		if (await $this.RecoverIfRequested(message)) return;
 		let app=$this.m_app;
 		let initial=app.GetState();
+		let imageInfo=await app.GetImageInfo();
 		let prior=initial.messages;
 		if (prior.at(-1)?.sender==='user'&&prior.at(-1)?.text===message) prior.pop();
 		let history=prior.slice(-20).map((entry)=>`${entry.sender}: ${entry.text}`).join('\n\n');
 		let changes=initial.accumulatedChanges.length?initial.accumulatedChanges.map((entry, index)=>`${index+1}. ${entry}`).join('\n'):'(none)';
-		let question=`Current image: ${initial.activeImage?'attached':'none'}\nPending generation changes:\n${changes}\nPrevious conversation (up to 20 messages):\n${history}\nCurrent user message:\n${message}`;
+		let question=`Current image: ${imageInfo?`${imageInfo.width} × ${imageInfo.height} pixels (${imageInfo.mimeType})`:'none'}\nSelected generation aspect ratio: ${initial.selectedRatio}\nPending generation changes:\n${changes}\nPrevious conversation (up to 20 messages):\n${history}\nCurrent user message:\n${message}`;
 		let image=initial.activeImage;
 		let changesOut=initial.accumulatedChanges;
 		let promptOut=initial.generationPrompt;
@@ -129,7 +130,7 @@ var Assistant=Function.extend(Object, function () {
 					return;
 				}
 				if (result.image) { image=result.image; edited=result.image; }
-				reports.push({action: action.name, status: 'success', result: result.message});
+				reports.push({action: action.name, status: 'success', result: result.message, ...(result.image?{image: {width: result.image.width, height: result.image.height, mimeType: result.image.mimeType}}:{})});
 			}
 			catch (error) {
 				reports.push({action: action.name, status: 'error', result: error instanceof Error?error.message:String(error)});

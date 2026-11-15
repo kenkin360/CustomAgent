@@ -60,6 +60,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return {...state, history: [...state.history], messages: [...state.messages], accumulatedChanges: [...state.accumulatedChanges]};
 	};
 
+	_['public'].GetImageInfo=async function () {
+		let $this=_(this);
+		let image=$this.m_state.activeImage;
+		if (!image) return null;
+		let dimensions=await $this.m_images.GetDimensions(image);
+		return {...dimensions, mimeType: image.mimeType, title: image.title};
+	};
+
 	_['public'].Reply=function (text, fields={}) {
 		_(this).AddMessage('agent', text, fields);
 	};
@@ -313,9 +321,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 				let runtime=this.GetRuntime();
 				if (typeof args.name==='string') {
 					if (typeof runtime[args.name]!=='function') throw new Error('Runtime function not found: '+args.name);
-					return {message: `${args.name}: ${String(runtime[args.name]).slice(0,12000)}`};
+					return {message: `${args.name}: ${runtime[args.name].Description||String(runtime[args.name]).slice(0,12000)}`};
 				}
-				return {message: `AppRuntime functions: ${this.GetNames().join(', ')||'(none)'}. Loaded extensions: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${_(this).m_versions.length}. Built-in actions: readAppSource, inspectRuntime, loadModule, callRuntime, rollbackCode, resetConversation.`};
+				return {message: `AppRuntime functions: ${this.GetNames().map((name)=>name+(runtime[name].Description?': '+runtime[name].Description:'')).join('; ')||'(none)'}. Loaded extensions: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible versions: ${_(this).m_versions.length}. Built-in actions: readAppSource, inspectRuntime, loadModule, callRuntime, rollbackCode, resetConversation.`};
 			}
 			case 'loadModule': {
 				if (typeof args.name!=='string'||!/^[A-Za-z_$][\w$]*$/.test(args.name)) throw new Error('Provide an extension class name.');
@@ -339,12 +347,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 				let value=await fn(input, {image});
 				let output=value&&typeof value==='object'&&'image' in value?value.image:value;
 				if (output&&typeof output.base64==='string'&&/^image\/(png|jpeg|webp)$/.test(output.mimeType)) {
+					let dimensions=await this.m_images.GetDimensions(output);
 					return {message: typeof value.message==='string'?value.message:`${name} updated the current image.`, image: {
 						...image, id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
 						, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
+						, ...dimensions
 						, prompt: `Local runtime edit: ${name}`
 						, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-						, aspectRatio: image?.aspectRatio||'1:1'
+						, aspectRatio: this.m_images.GetAspectRatio(dimensions)
 						, title: output.title||`${image?.title||'Image'} · ${name}`
 					}};
 				}
@@ -414,7 +424,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 		else picture.hidden=true;
 		this.Node('empty').style.display=state.activeImage?'none':'block';
-		this.Node('image-ratio').textContent=state.activeImage?.aspectRatio||'';
+		this.Node('image-ratio').textContent=state.activeImage?.width&&state.activeImage?.height?`${state.activeImage.width} × ${state.activeImage.height}`:'';
 		this.Node('generating').style.display=state.isGenerating?'flex':'none';
 		this.Node('thinking').hidden=!state.isConsulting;
 		let input=this.Node('input');
@@ -503,10 +513,10 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].SelectMedia=async function () {
 		let $this=_(this);
 		try {
-			let image=await $this.m_images.Select($this.m_state.selectedRatio);
+			let image=await $this.m_images.Select();
 			if (!image) return;
 			$this.SetValues({activeImage: image, history: [image, ...$this.m_state.history]});
-			await this.NotifyAssistant('Media selected', {Title: image.title}, image);
+			await this.NotifyAssistant('Media selected', {Title: image.title, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
@@ -514,10 +524,10 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].CaptureCamera=async function () {
 		let $this=_(this);
 		try {
-			let image=await $this.m_images.Capture($this.m_state.selectedRatio);
+			let image=await $this.m_images.Capture();
 			if (!image) return;
 			$this.SetValues({activeImage: image, history: [image, ...$this.m_state.history]});
-			await this.NotifyAssistant('Camera image captured', {Title: image.title}, image);
+			await this.NotifyAssistant('Camera image captured', {Title: image.title, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
@@ -532,7 +542,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			let generated=await $this.m_images.Generate(text, state.activeImage, state.selectedRatio, state.history.length+1);
 			let image=generated.Image;
 			$this.SetValues({activeImage: image, history: [image, ...state.history]});
-			await this.NotifyAssistant('Image generation completed', {Title: image.title, Prompt: text}, image);
+			await this.NotifyAssistant('Image generation completed', {Title: image.title, Prompt: text, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 		finally { $this.SetValues({isGenerating: false}); }

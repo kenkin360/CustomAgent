@@ -5,6 +5,7 @@ var DrawRectangle=Function.extend(Extensible, function () {
 	function DrawRectangle(runtime) {
 		_['base'].apply(this, arguments);
 		runtime.drawRectangle=this.Run.bind(this);
+		runtime.drawRectangle.Description='Draw a rectangle on the current image. Arguments: normalized x, y, width, height (0–1), stroke (#RRGGBB), strokeWidth (pixels), optional fill (#RRGGBB).';
 	}
 
 	_['private'].Validate=function (value) {
