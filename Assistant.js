@@ -12,10 +12,6 @@ var Assistant=Function.extend(Object, function () {
 		$this.m_ready=$this.Welcome();
 	}
 
-	_['public'].GenerateText=function (prompt, options) {
-		return Flow.generate.text(`${prompt}. `, options);
-	};
-
 	_['public'].Destroy=function () {
 		_(this).m_detach?.();
 		_(this).m_detachEvent?.();
@@ -42,7 +38,7 @@ var Assistant=Function.extend(Object, function () {
 		}
 
 		try {
-			let response=await this.GenerateText('', {systemInstruction: `
+			let response=await Flow.generate.text('. ', {systemInstruction: `
 你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，僅描述確實可用的能力。這裡只有原碼檔案清單與執行狀態；需要原碼內容時再使用對應讀取操作。若啟動失敗，說明真實錯誤。請依瀏覽器語系或使用者對話語言回覆；無法判斷時使用英文。
 ${runtime.message}
 啟動結果：${setupError||'success'}
@@ -115,9 +111,9 @@ ${runtime.message}
 
 需要操作時，在答覆最後附一個 json 程式碼區塊，包含 {"attemptPlan":[{"action":"操作名稱","attempts":1,"reason":"目的與重試條件"}],"localAction":{"name":"操作名稱","arguments":{}}}。不需要操作時可直接以一般文字答覆。App 每次只執行一項操作，並將真實結果送回；依結果繼續、調整或停止。不必固定重試次數，但不要重複已成功的操作。收到成功結果前不得宣稱已完成。
 readCompiledSource 空參數列出啟動時已完整拆解的固定 host 檔案，{file} 取得完整原碼；readRemoteSource 空參數列出 Bundle.Config 等遠端來源，{name} 可重新取得其內容；readInstalledSource 空參數列出已安裝模組，{name} 取得安裝時保留的完整原碼，遠端安裝者可重新取得。inspectRuntime 檢查現有函數、模組及原碼入口。不要聲稱讀過尚未透過操作取得的原碼。
-loadModule 使用程式碼或網址作為獨立的原始文字，不放進 JSON。請先輸出一個 javascript 程式碼區塊（新模組原碼），或一個 text 程式碼區塊（遠端腳本 URL）；接著在答覆最後輸出操作控制 JSON，其 localAction 為 {"name":"loadModule","arguments":{"name":"模組名稱"}}，並在 attemptPlan 列出 loadModule。App 會將前面的原文作為 LoadModule(source, options) 的第一參數，由 Resource.Module 載入以該名稱公開的 JavaScript 值；不要求繼承、建立實例或使用 export/globalThis 賦值。若載入值有 ActionName 與靜態 Run 函數，App 登記為可呼叫的 runtime 函數。更新程式請用新的模組名稱。不得把原始碼放進 arguments.code。
-callRuntime 接受 {name,arguments}；rollbackCode 僅恢復上一項安裝的模組與函數登記，不恢復 UI；resetConversation 清空對話。需要實作新功能時可先讀程式碼，再撰寫並載入模組；不要以不存在的功能已預載為由拒絕。
-可用模組可使用瀏覽器標準 API，操作目前影像時，runtime 函數收到參數與 {image}，回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面；會改動 UI 的模組應自行提供可呼叫的清理函數，rollbackCode 不代替模組清理 UI。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。不要假設原始 App 檔案可被本次 runtime 修改永久覆寫。
+loadModule 使用程式碼或網址作為獨立的原始文字，不放進 JSON。請先輸出一個 javascript 程式碼區塊（新模組原碼），或一個 text 程式碼區塊（遠端腳本 URL）；接著在答覆最後輸出操作控制 JSON，其 localAction 為 {"name":"loadModule","arguments":{"name":"模組名稱"}}，並在 attemptPlan 列出 loadModule。App 會將前面的原文作為 LoadModule(source, options) 的第一參數，由 Resource.Module 載入以該名稱公開的 JavaScript 值；不要求繼承、建立實例或使用 export/globalThis 賦值。若載入值有靜態 Run 函數，以模組名稱直接呼叫。更新程式請用新的模組名稱。不得把原始碼放進 arguments.code。
+直接以模組名稱作為操作名稱呼叫其 Run；rollback 僅恢復上一項安裝的模組與函數登記，不恢復 UI；resetConversation 清空對話。需要實作新功能時可先讀程式碼，再撰寫並載入模組；不要以不存在的功能已預載為由拒絕。
+可用模組可使用瀏覽器標準 API，操作目前影像時，runtime 函數收到參數與 {image}，回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面；會改動 UI 的模組應自行提供可呼叫的清理函數，rollback 不代替模組清理 UI。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。不要假設原始 App 檔案可被本次 runtime 修改永久覆寫。
 若有待使用者確認的生成修改，可於 JSON 加入 accumulatedChanges、suggestedPrompt、aspectRatio；已完成的本地操作不得當作待生成修改。操作結果與錯誤由 App 回傳；答覆使用者時說明真實結果，不展示控制 JSON 或原始工具輸出，除非使用者要求查看。
 `;
 	};
@@ -176,7 +172,7 @@ Choose the next action, revise the plan, or give a final answer. Do not repeat s
 			let options={systemInstruction: $this.Instruction(runtime)};
 			if (image) options.images=[{base64: image.base64, mimeType: image.mimeType}];
 
-			let response=await this.GenerateText(request, options);
+			let response=await Flow.generate.text(`${request}. `, options);
 			if (turn?.cancelled) return;
 
 			let control=$this.ReadControl(response.text);
@@ -214,7 +210,7 @@ Choose the next action, revise the plan, or give a final answer. Do not repeat s
 				if (turn?.cancelled) return;
 
 				if (result.conversationReset) {
-					let fresh=await this.GenerateText('', {systemInstruction: `
+					let fresh=await Flow.generate.text('. ', {systemInstruction: `
 App 已清空對話。以使用者這次要求的語言自然回覆，無須提及先前對話。不要輸出操作控制 JSON。
 `});
 					if (turn?.cancelled) return;
@@ -267,12 +263,13 @@ App 已清空對話。以使用者這次要求的語言自然回覆，無須提�
 		}
 
 		if (!answer) {
-			let response=await this.GenerateText(`
+			let prompt=`
 ${question()}
 Actual action results:
 ${reports.map(JSON.stringify).join('\n')}
 Give the user your final answer based on these results, without requesting another action or outputting control JSON.
-`, {systemInstruction: `
+`;
+			let response=await Flow.generate.text(`${prompt}. `, {systemInstruction: `
 依使用者的語言回答。只能聲稱 App 已回報成功的操作，並準確說明失敗原因。請勿輸出控制 JSON。
 `});
 			if (turn?.cancelled) return;
@@ -310,13 +307,14 @@ Give the user your final answer based on these results, without requesting anoth
 			.map((entry)=>`${entry.sender}: ${entry.text}`)
 			.join('\n');
 
-		let response=await this.GenerateText(`
+		let prompt=`
 Recent conversation:
 ${messages}
 App event: ${event}
 Actual result: ${JSON.stringify(details)}
 Reply briefly to the user in the language of the current conversation.
-`, {systemInstruction: `
+`;
+		let response=await Flow.generate.text(`${prompt}. `, {systemInstruction: `
 僅說明 App 回報的真實結果，不宣稱未回報成功的操作；依使用者當前對話語言回覆，不輸出控制 JSON。
 `});
 
