@@ -410,9 +410,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (state.activeImage) {
 			let url=`data:${state.activeImage.mimeType};base64,${state.activeImage.base64}`;
 			if (picture.src!==url) picture.src=url;
-			picture.style.display='block';
+			picture.hidden=false;
 		}
-		else picture.style.display='none';
+		else picture.hidden=true;
 		this.Node('empty').style.display=state.activeImage?'none':'block';
 		this.Node('image-ratio').textContent=state.activeImage?.aspectRatio||'';
 		this.Node('generating').style.display=state.isGenerating?'flex':'none';
