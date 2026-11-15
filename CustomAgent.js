@@ -31,7 +31,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 			, readInstalledSource: (args)=>this.ReadInstalledSource(args)
 			, inspectRuntime: (args)=>this.InspectRuntime(args)
 			, loadModule: (args, context)=>{
-				if (Object.prototype.hasOwnProperty.call(args, 'code')||Object.prototype.hasOwnProperty.call(args, 'specifier')) throw new Error('Pass module source separately from action arguments.');
 				return this.LoadModule(context.source, {name: args.name, Type: context.Type, readyMember: args.readyMember, track: context.track});
 			}
 			, rollback: ()=>({message: this.Rollback()})
