@@ -318,8 +318,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let remote=/^https?:\/\//i.test(source.trim());
 		if ($this.GetRuntime().Modules[name]&&remote) return {message: name+' is already loaded.'};
 		if ($this.GetRuntime().Modules[name]&&!remote) throw new Error('Use a new module name for updated code.');
-		let url=remote?source.trim():`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`;
-		let value=await new Resource.Module(name, url, readyMember);
+		let value=remote
+			?await new Resource.Module(name, source.trim(), readyMember)
+			:await new Resource.Inline(name, source, readyMember);
 		return $this.RegisterModule(name, value, source, remote, track);
 	};
 
