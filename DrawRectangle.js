@@ -1,11 +1,9 @@
-var DrawRectangle=Function.extend(Extensible, function () {
+var DrawRectangle=Function.extend(Object, function () {
 	var _=this(DrawRectangle);
 	DrawRectangle=_[DrawRectangle];
 
-	function DrawRectangle(runtime) {
+	function DrawRectangle() {
 		_['base'].apply(this, arguments);
-		runtime.drawRectangle=this.Run.bind(this);
-		runtime.drawRectangle.Description='Draw a rectangle on the current image. Arguments: normalized x, y, width, height (0–1), stroke (#RRGGBB), strokeWidth (pixels), optional fill (#RRGGBB).';
 	}
 
 	_['private'].Validate=function (value) {
@@ -47,4 +45,9 @@ var DrawRectangle=Function.extend(Extensible, function () {
 			, title: image.title+' · Rectangle'
 		}};
 	};
+
+	DrawRectangle.ActionName='drawRectangle';
+	DrawRectangle.Default=new DrawRectangle();
+	DrawRectangle.Run=DrawRectangle.Default.Run.bind(DrawRectangle.Default);
+	DrawRectangle.Run.Description='Draw a rectangle on the current image. Arguments: normalized x, y, width, height (0–1), stroke (#RRGGBB), strokeWidth (pixels), optional fill (#RRGGBB).';
 });
