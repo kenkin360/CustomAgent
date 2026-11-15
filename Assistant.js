@@ -12,7 +12,7 @@ var Assistant=Function.extend(Object, function () {
 	}
 
 	_['public'].GenerateText=function (prompt, options) {
-		return Flow.generate.text(prompt, options);
+		return Flow.generate.text(`${prompt}. `, options);
 	};
 
 	_['public'].Destroy=function () {
