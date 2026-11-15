@@ -26,9 +26,20 @@ var ImageService=Function.extend(Object, function () {
 		return width/a+':'+height/a;
 	};
 
+	_['private'].GetContent=async function (media) {
+		if (typeof media?.base64==='string'&&media.base64&&typeof media.mimeType==='string'&&media.mimeType) return media;
+		if (!media?.mediaId) throw new Error('The image has neither content nor a mediaId.');
+		let content=await this.m_flow.media.getBase64({mediaId: media.mediaId});
+		if (typeof content?.base64!=='string'||!content.base64) throw new Error('Flow did not return the selected image content.');
+		let mimeType=content.mimeType||media.mimeType;
+		if (!mimeType) throw new Error('Flow did not return the selected image MIME type.');
+		return {...media, ...content, mimeType};
+	};
+
 	_['public'].Select=async function () {
 		let selected=await _(this).m_flow.media.select({filter: 'image'});
 		if (!selected) return null;
+		selected=await _(this).GetContent(selected);
 		let dimensions=await this.GetDimensions(selected);
 		return {
 			id: 'img_'+Date.now()
@@ -80,6 +91,7 @@ var ImageService=Function.extend(Object, function () {
 			, aspectRatio
 			, modelDisplayName: ImageService.ModelDisplayName
 		});
+		result=await _(this).GetContent(result);
 		let dimensions=await this.GetDimensions(result);
 		return {
 			SourceMediaId: mediaId
