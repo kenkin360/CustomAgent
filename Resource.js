@@ -253,7 +253,7 @@ var Resource=Function.extend(Promise, function () {
 			element.id=state.Name+'-loader';
 			element.async=true;
 			let finish=(error, value)=>{
-				window.removeEventListener('error', state.EvaluationHandler);
+				window.removeEventListener('error', state.EvaluationHandler, true);
 				$this.Finish(error, value);
 			};
 			state.LoadHandler=()=>{
@@ -270,11 +270,12 @@ var Resource=Function.extend(Promise, function () {
 			state.EvaluationHandler=(event)=>{
 				if (event.filename!==state.Url&&event.filename!==element.src) return;
 				event.preventDefault();
+				event.stopImmediatePropagation();
 				let location=event.lineno?` at ${event.lineno}:${event.colno||1}`:'';
 				let reason=event.error?.message||event.message||'Script evaluation failed';
 				finish(new Error(`${state.Name}: ${event.error?.name||'Error'}: ${reason}${location}`));
 			};
-			window.addEventListener('error', state.EvaluationHandler);
+			window.addEventListener('error', state.EvaluationHandler, true);
 			element.addEventListener('load', state.LoadHandler);
 			element.addEventListener('error', state.ErrorHandler);
 			try {
