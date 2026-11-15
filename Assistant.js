@@ -39,18 +39,15 @@ var Assistant=Function.extend(Object, function () {
 		}
 		catch (error) { setupError=[setupError,error.message||String(error)].filter(Boolean).join('; '); }
 		try {
-			let response=await this.GenerateText(`
-You are running inside this App. Inspect its actual capabilities before introducing yourself.
+			let response=await this.GenerateText('', {systemInstruction: `
+你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，僅描述確實可用的能力。若啟動失敗，說明真實錯誤。請依瀏覽器語系或使用者對話語言回覆；無法判斷時使用英文。
 ${capabilities.message}
 ${runtime.message}
 ${source}
-Startup result: ${setupError||'success'}
-Interface locale: ${navigator.language}. Briefly greet the user in the language appropriate for the interface or conversation. Describe only capabilities verified above. If startup failed, explain the actual failure.
-`, {
-				systemInstruction: `
-You are the assistant inside this App. Reply to the user naturally in the appropriate language. Do not claim an action occurred unless the App reported it.
-`
-			});
+啟動結果：${setupError||'success'}
+瀏覽器語系：${navigator.language}
+不可聲稱尚未執行的操作已經成功。不要輸出操作控制 JSON。
+`});
 			if (response.text?.trim()&&!app.GetState().messages.length) app.Reply(response.text.trim());
 		}
 		catch (error) {
@@ -77,47 +74,25 @@ You are the assistant inside this App. Reply to the user naturally in the approp
 		return {Data: null, Text: String(value).trim()};
 	};
 
-	_['private'].RepairControl=async function (question, response, runtime, images) {
-		let options={systemInstruction: `
-You are deciding whether the user's current request requires an App operation. The App can perform local actions; do not conclude that an action is unavailable merely because the previous answer did not request it. Available capabilities: ${runtime.message}
-Return exactly one JSON object with keys attemptPlan and localAction. If the user asks the App to inspect, modify, install, run, or verify something, choose the first necessary action and include it in attemptPlan. If the user only asks for an explanation or discussion, set localAction to null and attemptPlan to []. For an action use {"attemptPlan":[{"action":"actionName","attempts":1,"reason":"purpose"}],"localAction":{"name":"actionName","arguments":{}}}. Do not claim an action ran. Do not answer the user here.
-`};
-		if (images) options.images=images;
-		let decision=await this.GenerateText(`
-${question}
-Previous answer without a valid action decision:
-${response}
-Decide whether the App needs to act now. Return JSON only.
-`, options);
-		return this.ReadControl(decision.text);
+	_['private'].Instruction=function (runtime) {
+		return `
+你是此 App 的 Assistant。你可以討論需求，也可以請 App 執行本地操作；只有使用者按下生成按鈕才生成影像。請依使用者本輪使用的語言自然答覆，無法判斷時參考對話或瀏覽器語系，仍無法判斷時使用英文。
+實際能力：${runtime.message}
+需要操作時，在答覆最後附一個 json 程式碼區塊，包含 {"attemptPlan":[{"action":"操作名稱","attempts":1,"reason":"目的與重試條件"}],"localAction":{"name":"操作名稱","arguments":{}}}。不需要操作時可直接以一般文字答覆。App 每次只執行一項操作，並將真實結果送回；依結果繼續、調整或停止。不必固定重試次數，但不要重複已成功的操作。收到成功結果前不得宣稱已完成。
+readAppSource 空參數可列出程式碼檔案，{file,query} 可查閱內容；inspectRuntime 可檢查現有函數與模組。loadModule 接受 {name,specifier} 或 {name,code}，由 Resource.Module 載入以該名稱公開的 JavaScript 值；不要求繼承、建立實例或使用 export/globalThis 賦值。若載入值有 ActionName 與靜態 Run 函數，App 會登記為可呼叫的 runtime 函數；模組自身亦可透過 AppRuntime.UI 使用介面 API。callRuntime 接受 {name,arguments}；rollbackCode 可回復上一版 runtime，resetConversation 可清空對話。需要實作新功能時可先讀程式碼，再撰寫並載入模組；不要以不存在的功能已預載為由拒絕。
+可用模組可使用瀏覽器標準 API，操作目前影像時，runtime 函數收到參數與 {image}，回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。不要假設原始 App 檔案可被本次 runtime 修改永久覆寫。
+若有待使用者確認的生成修改，可於 JSON 加入 accumulatedChanges、suggestedPrompt、aspectRatio；已完成的本地操作不得當作待生成修改。操作結果與錯誤由 App 回傳；答覆使用者時說明真實結果，不展示控制 JSON 或原始工具輸出，除非使用者要求查看。
+`;
 	};
 
-	_['private'].RecoverIfRequested=async function (message) {
-		let app=this.m_app;
-		if (!app.HasVersion()) return false;
-		if (/^\s*\/(?:rollback|undo)\s*$/i.test(message)) {
-			await this.Report('The App restored the previous runtime code version.', {Result: app.Rollback()});
-			return true;
-		}
-		let response=await this.GenerateText(`
-${message}
-`, {
-			systemInstruction: `
-Classify whether the user asks to undo a recent runtime code change or says the latest change is broken and should be undone. Answer exactly ROLLBACK or CONTINUE. A question about an error or a request for a new fix is CONTINUE.
-`
-		});
-		if (!/^ROLLBACK\b/i.test(response.text.trim())) return false;
-		await this.Report('The App restored the previous runtime code version.', {Result: app.Rollback()});
-		return true;
-	};
-
-	_['private'].HandleMessage=async function (message) {
+	_['private'].HandleMessage=async function (message, turn) {
 		let $this=_(this);
 		await $this.m_ready;
-		if (await $this.RecoverIfRequested(message)) return;
+		if (turn?.cancelled) return;
 		let app=$this.m_app;
 		let initial=app.GetState();
 		let imageInfo=await app.GetImageInfo();
+		if (turn?.cancelled) return;
 		let prior=initial.messages.slice();
 		if (prior.at(-1)?.sender==='user'&&prior.at(-1)?.text===message) prior.pop();
 		let history=prior.slice(-20).map((entry)=>`${entry.sender}: ${entry.text}`).join('\n\n');
@@ -143,6 +118,7 @@ ${message}
 		let structured=false;
 		let runtime=await app.InspectRuntime({});
 		for (;;) {
+			if (turn?.cancelled) return;
 			let request=reports.length?`
 ${question()}
 Current action plan: ${JSON.stringify(plan)}
@@ -150,18 +126,11 @@ Actual action results:
 ${reports.map(JSON.stringify).join('\n')}
 Choose the next action, revise the plan, or give a final answer. Do not repeat successful actions or claim failed actions succeeded.
 `:question();
-			let options={systemInstruction: `
-You are the assistant running in this App. Actual capabilities: ${runtime.message}
-You may discuss freely. Only the user's Generate button starts image generation. To request a local operation, append one final fenced json block with {"attemptPlan":[{"action":"name","attempts":1,"reason":"reason"}],"localAction":{"name":"name","arguments":{}}}. If no operation is needed use {"localAction":null}. The App executes one action and returns its actual result; decide what to do next after reading it. readAppSource with empty arguments lists files; use it to inspect implementation whenever needed. loadModule accepts {name,specifier} for an external classic script or {name,code} for new JavaScript. In either case the script declares exactly one top-level var with that name whose value is a Function.extend(Extensible, ...) class; its constructor receives AppRuntime and registers functions or mounts UI. Do not use import, export, or explicit globalThis assignment in this class. Use a new class name for each update; it may replace an existing runtime function. AppRuntime.UI is this App. An extension can use standard browser Image and canvas APIs to edit the image as DrawRectangle.js does, return {image:{base64,mimeType}}, or mount controls through AppRuntime.UI.Mount. If a requested function is absent, inspect relevant source and implement an extension when requested; absence of a built-in action does not mean it cannot be done. Only report an operation as completed after its successful App result, including actual output dimensions. Local operations that completed are not pending image generation changes. Optional JSON fields: accumulatedChanges, suggestedPrompt, aspectRatio. Answer naturally in the user's language. Never claim unreported success or show control JSON unless asked.
-`};
+			let options={systemInstruction: $this.Instruction(runtime)};
 			if (image) options.images=[{base64: image.base64, mimeType: image.mimeType}];
 			let response=await this.GenerateText(request, options);
+			if (turn?.cancelled) return;
 			let control=$this.ReadControl(response.text);
-			if (!control.Data) {
-				let repaired=await $this.RepairControl(request, response.text, runtime, options.images);
-				if (!repaired.Data) throw new Error('The model did not return a valid local action decision. No App operation was executed.');
-				if (repaired.Data.localAction) control=repaired;
-			}
 			answer=control.Text;
 			let data=control.Data;
 			if (data) {
@@ -178,13 +147,14 @@ You may discuss freely. Only the user's Generate button starts image generation.
 				continue;
 			}
 			try {
+				if (turn?.cancelled) return;
 				let result=await app.RunAction(action);
+				if (turn?.cancelled) return;
 				if (result.conversationReset) {
-					let fresh=await this.GenerateText(`
-The App has cleared the conversation. Greet the user naturally in the language of their request. Do not refer to earlier conversation.
-`, {systemInstruction: `
-Reply naturally to the user. Do not output control JSON.
+					let fresh=await this.GenerateText('', {systemInstruction: `
+App 已清空對話。以使用者這次要求的語言自然回覆，無須提及先前對話。不要輸出操作控制 JSON。
 `});
+					if (turn?.cancelled) return;
 					if (!fresh.text?.trim()) throw new Error('The model returned an empty answer.');
 					app.Reply(fresh.text.trim());
 					return;
@@ -201,18 +171,20 @@ Reply naturally to the user. Do not output control JSON.
 				reports.push({action: action.name, status: 'error', result: error instanceof Error?error.message:String(error)});
 			}
 		}
-		if (reports.length||!answer) {
+		if (!answer) {
 			let response=await this.GenerateText(`
 ${question()}
 Actual action results:
 ${reports.map(JSON.stringify).join('\n')}
 Give the user your final answer based on these results, without requesting another action or outputting control JSON.
 `, {systemInstruction: `
-Answer in the user's language. State only actions confirmed successful by the App and explain failures accurately.
+依使用者的語言回答。只能聲稱 App 已回報成功的操作，並準確說明失敗原因。請勿輸出控制 JSON。
 `});
+			if (turn?.cancelled) return;
 			answer=response.text?.trim();
 		}
 		if (!answer) throw new Error('The model returned an empty answer.');
+		if (turn?.cancelled) return;
 		if (structured) app.UpdateConversation({accumulatedChanges: changesOut, generationPrompt: changesOut.length?promptOut:'', selectedRatio: ratioOut});
 		app.Reply(answer, {
 			accumulatedChanges: changesOut
@@ -232,7 +204,7 @@ App event: ${event}
 Actual result: ${JSON.stringify(details)}
 Reply briefly to the user in the language of the current conversation.
 `, {systemInstruction: `
-Describe only the actual App result. Do not claim unreported actions. Do not output control JSON.
+僅說明 App 回報的真實結果，不宣稱未回報成功的操作；依使用者當前對話語言回覆，不輸出控制 JSON。
 `});
 		if (!response.text?.trim()) throw new Error('The model returned an empty answer.');
 		_(this).m_app.Reply(response.text.trim(), image?{includedImage: image}:{});
