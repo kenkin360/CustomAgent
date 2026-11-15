@@ -38,7 +38,7 @@ var Assistant=Function.extend(Object, function () {
 		}
 
 		try {
-			let response=await Flow.generate.text('. ', {systemInstruction: `
+			let response=await Flow.generate.text('.', {systemInstruction: `
 你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，僅描述確實可用的能力。這裡只有原碼檔案清單與執行狀態；需要原碼內容時再使用對應讀取操作。若啟動失敗，說明真實錯誤。請依瀏覽器語系或使用者對話語言回覆；無法判斷時使用英文。
 ${runtime.message}
 啟動結果：${setupError||'success'}
@@ -210,7 +210,7 @@ Choose the next action, revise the plan, or give a final answer. If a module fai
 				if (turn?.cancelled) return;
 
 				if (result.conversationReset) {
-					let fresh=await Flow.generate.text('. ', {systemInstruction: `
+					let fresh=await Flow.generate.text('.', {systemInstruction: `
 App 已清空對話。以使用者這次要求的語言自然回覆，無須提及先前對話。不要輸出操作控制 JSON。
 `});
 					if (turn?.cancelled) return;
