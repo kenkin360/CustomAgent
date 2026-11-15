@@ -14,11 +14,11 @@ var Bundle=Function.extend(Function, function () {
 		let total=Bundle.Config.length;
 		let completed=0;
 		for (let i=total; i-->0; ) {
-			let [key, url]=Bundle.Config[i];
+			let [key, url, readyMember]=Bundle.Config[i];
 			let progress={Key: key, File: url.split(/[?#]/)[0].split('/').pop(), Completed: completed, Total: total, Value: null, Error: null};
 			onProgress?.(progress);
 			try {
-				let value=await new Resource.Module(key, url);
+				let value=await new Resource.Module(key, url, readyMember);
 				loaded[key]=value;
 				completed++;
 				onProgress?.({...progress, Completed: completed, Value: value});
@@ -39,7 +39,7 @@ var Bundle=Function.extend(Function, function () {
 		['CustomAgent', Bundle.CustomAgent('CustomAgent.js')]
 		, ['Assistant', Bundle.CustomAgent('Assistant.js')]
 		, ['ImageService', Bundle.CustomAgent('ImageService.js')]
-		, ['Extensible', Bundle.CustomAgent('Extensible.js')]
+		, ['cv', 'https://esm.sh/gh/TechStark/opencv-js/dist/opencv.js?raw', 'Mat']
 		, ['agentTemplate', Bundle.CustomAgent('views/agent.html.js')]
 	];
 });
