@@ -21,11 +21,25 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_versions=[];
 		$this.m_mounted=new Map();
 		$this.m_listeners=new Set();
-		$this.m_handler=null;
 		$this.m_messageListener=null;
 		$this.m_eventListener=null;
 		$this.m_startup=null;
-		$this.m_sources=[...(props.SourceFiles||[]), ['DrawRectangle', Bundle.CustomAgent('DrawRectangle.js')], ['UpscaleCode', Bundle.CustomAgent('UpscaleCode.js')]];
+		$this.m_sources=[...(props.SourceFiles||[]), ['DrawRectangle', Bundle.CustomAgent('DrawRectangle.js')], ['Upscale', Bundle.CustomAgent('Upscale.js')]];
+		$this.m_actions=Object.assign(Object.create(null), {
+			readCompiledSource: (args)=>this.ReadCompiledSource(args)
+			, readRemoteSource: (args)=>this.ReadRemoteSource(args)
+			, readInstalledSource: (args)=>this.ReadInstalledSource(args)
+			, inspectRuntime: (args)=>this.InspectRuntime(args)
+			, loadModule: (args, context)=>{
+				if (Object.prototype.hasOwnProperty.call(args, 'code')||Object.prototype.hasOwnProperty.call(args, 'specifier')) throw new Error('Pass module source separately from action arguments.');
+				return this.LoadModule(context.source, {name: args.name, readyMember: args.readyMember, track: context.track});
+			}
+			, rollback: ()=>({message: this.Rollback()})
+			, resetConversation: ()=>{
+				this.ResetConversation();
+				return {message: 'Conversation cleared.', conversationReset: true};
+			}
+		});
 		$this.m_compiledSources=Object.create(null);
 		$this.m_compiledError=null;
 		try { $this.m_compiledSources=$this.ParseCompiledSource(props.HostSourceUrl); }
@@ -37,6 +51,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_lastConsulting=null;
 		$this.m_lastHistory=null;
 		$this.m_activeTurn=null;
+		$this.m_clickBindings=[];
 		$this.m_locale=(navigator.languages||[]).find((language)=>/^zh\b/i.test(language))?'zh':/^zh\b/i.test(navigator.language||'')?'zh':'en';
 	}
 
@@ -143,18 +158,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 	};
 
-	_['public'].GetConversationHandler=function () { return _(this).m_handler; };
-
-	_['public'].SetConversationHandler=function (handler) {
-		if (handler!==null&&typeof handler!=='function') throw new Error('Conversation handler must be a function or null.');
-		let $this=_(this);
-		let previous=$this.m_handler;
-		$this.m_handler=handler;
-		return ()=>{ if ($this.m_handler===handler) $this.m_handler=previous; };
-	};
-
-	_['public'].HasConversationHandler=function () { return _(this).m_handler!==null; };
-	_['public'].GenerateText=function (prompt, options) { return _(this).m_assistant.GenerateText(prompt, options); };
 	_['public'].UpdateConversation=function (patch) { _(this).SetValues(patch); };
 	_['public'].ResetConversation=function () {
 		let $this=_(this);
@@ -181,8 +184,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.SetValues({isConsulting: false});
 	};
 	_['public'].PickMedia=function () { return this.SelectMedia(); };
-	_['public'].RollbackCode=function () { return this.Rollback(); };
-
 	_['public'].RunAction=async function (action, track=true, source) {
 		let $this=_(this);
 		await $this.m_startup;
@@ -193,7 +194,13 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].InspectRuntime=function (args={}) {
-		return _(this).ExecuteAction({name: 'inspectRuntime', arguments: args}, _(this).m_state.activeImage);
+		let runtime=this.GetRuntime();
+		if (typeof args.name==='string') {
+			let fn=runtime.Modules[args.name]?.Run;
+			if (typeof fn!=='function') throw new Error('Runtime function not found: '+args.name);
+			return {message: `${args.name}: ${fn.Description||String(fn)}`};
+		}
+		return {message: `Callable modules: ${this.GetNames().map((name)=>name+(runtime.Modules[name].Run.Description?': '+runtime.Modules[name].Run.Description:'')).join('; ')||'(none)'}. Loaded modules: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. Compiled source files: ${JSON.stringify(Object.keys(_(this).m_compiledSources))}. Bundle.Config: ${JSON.stringify(Bundle.Config)}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Reversible installations: ${_(this).m_versions.length}. Built-in actions: ${Object.keys(_(this).m_actions).join(', ')}.`};
 	};
 
 	_['public'].GetRuntime=function () {
@@ -205,7 +212,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].GetNames=function () {
-		return Object.keys(this.GetRuntime()).filter((name)=>typeof this.GetRuntime()[name]==='function');
+		let modules=this.GetRuntime().Modules;
+		return Object.keys(modules).filter((name)=>typeof modules[name]?.Run==='function');
 	};
 
 	_['public'].HasVersion=function () {
@@ -216,13 +224,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		let installation=$this.m_versions.at(-1);
 		if (!installation) throw new Error('No previous module installation is available.');
-		let runtime=this.GetRuntime();
 		let restore=(target, name, descriptor)=>{
 			if (descriptor) Object.defineProperty(target, name, descriptor);
 			else delete target[name];
 		};
-		restore(runtime.Modules, installation.Name, installation.PreviousModule);
-		if (installation.ActionName) restore(runtime, installation.ActionName, installation.PreviousAction);
+		restore(this.GetRuntime().Modules, installation.Name, installation.PreviousModule);
 		restore($this.m_installedSources, installation.Name, installation.PreviousSource);
 		$this.m_versions.pop();
 		return `Restored the previous module registration. ${$this.m_versions.length} earlier installations remain. UI changes made by the module require its own cleanup.`;
@@ -233,7 +239,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (!$this.m_startup) {
 			$this.m_startup=(async ()=>{
 				await this.LoadModule(Bundle.CustomAgent('DrawRectangle.js'), {name: 'DrawRectangle', track: false});
-				await this.LoadModule(Bundle.CustomAgent('UpscaleCode.js'), {name: 'UpscaleCode', track: false});
+				await this.LoadModule(Bundle.CustomAgent('Upscale.js'), {name: 'Upscale', track: false});
 			})().catch((error)=>{
 				$this.m_startup=null;
 				throw error;
@@ -245,20 +251,16 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['private'].RegisterModule=function (name, value, source, remote, track) {
 		if (value==null) throw new Error(name+' did not expose a module value.');
 		let runtime=this.GetRuntime();
-		let actionName=value.ActionName;
-		if (actionName!==undefined&&(typeof actionName!=='string'||!/^[A-Za-z_$][\w$]*$/.test(actionName)||typeof value.Run!=='function')) throw new Error(name+' has an invalid ActionName or Run method.');
+		if (value.Run!==undefined&&typeof value.Run!=='function') throw new Error(name+' has an invalid Run method.');
 		let installation={
 			Name: name
 			, PreviousModule: Object.getOwnPropertyDescriptor(runtime.Modules, name)
 			, PreviousSource: Object.getOwnPropertyDescriptor(this.m_installedSources, name)
-			, ActionName: actionName
-			, PreviousAction: actionName?Object.getOwnPropertyDescriptor(runtime, actionName):null
 		};
 		runtime.Modules[name]=value;
-		if (actionName) runtime[actionName]=value.Run;
 		this.m_installedSources[name]={Source: source, Remote: remote};
 		if (track) this.m_versions.push(installation);
-		return {message: `${name} loaded. Registered functions: ${actionName||'(none)'}. Reversible installations: ${this.m_versions.length}.`};
+		return {message: `${name} loaded. Callable: ${typeof value.Run==='function'?'Run':'(none)'}. Reversible installations: ${this.m_versions.length}.`};
 	};
 
 	_['private'].ParseCompiledSource=function (url) {
@@ -324,54 +326,29 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['private'].ExecuteAction=async function (action, image, track=true, source) {
 		if (!action?.arguments||typeof action.arguments!=='object'||Array.isArray(action.arguments)) throw new Error('Action arguments must be an object.');
 		let args=action.arguments;
-		switch (action.name) {
-			case 'readCompiledSource': return this.ReadCompiledSource(args);
-			case 'readRemoteSource': return this.ReadRemoteSource(args);
-			case 'readInstalledSource': return this.ReadInstalledSource(args);
-			case 'inspectRuntime': {
-				let runtime=this.GetRuntime();
-				if (typeof args.name==='string') {
-					if (typeof runtime[args.name]!=='function') throw new Error('Runtime function not found: '+args.name);
-					return {message: `${args.name}: ${runtime[args.name].Description||String(runtime[args.name])}`};
-				}
-				return {message: `AppRuntime functions: ${this.GetNames().map((name)=>name+(runtime[name].Description?': '+runtime[name].Description:'')).join('; ')||'(none)'}. Loaded modules: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. Compiled source files: ${JSON.stringify(Object.keys(this.m_compiledSources))}. Bundle.Config: ${JSON.stringify(Bundle.Config)}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Custom conversation: ${this.HasConversationHandler()||false}. Reversible installations: ${_(this).m_versions.length}. Built-in actions: readCompiledSource, readRemoteSource, readInstalledSource, inspectRuntime, loadModule, callRuntime, rollbackCode, resetConversation.`};
-			}
-			case 'loadModule': {
-				if (Object.prototype.hasOwnProperty.call(args, 'code')||Object.prototype.hasOwnProperty.call(args, 'specifier')) throw new Error('Pass module source separately from action arguments.');
-				return this.LoadModule(source, {name: args.name, readyMember: args.readyMember, track});
-			}
-			case 'rollbackCode': return {message: this.Rollback()};
-			case 'resetConversation':
-				this.ResetConversation();
-				return {message: 'Conversation cleared.', conversationReset: true};
-			default: {
-				let name=action.name==='callRuntime'?args.name:action.name;
-				let input=action.name==='callRuntime'?args.arguments??{}:args;
-				let fn=this.GetRuntime()[name];
-				if (typeof fn!=='function') throw new Error('Runtime function not found: '+String(name));
-				let value=await fn(input, {image});
-				let output=value&&typeof value==='object'&&'image' in value?value.image:value;
-				if (output&&typeof output.base64==='string'&&/^image\/(png|jpeg|webp)$/.test(output.mimeType)) {
-					let dimensions=await this.m_images.GetDimensions(output);
-					return {message: typeof value.message==='string'?value.message:`${name} updated the current image.`, image: {
-						...image, id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
-						, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
-						, ...dimensions
-						, prompt: `Local runtime edit: ${name}`
-						, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-						, aspectRatio: this.m_images.GetAspectRatio(dimensions)
-						, title: output.title||`${image?.title||'Image'} · ${name}`
-					}};
-				}
-				return {message: `${name}: ${(typeof value==='string'?value:JSON.stringify(value)??'completed').slice(0,12000)}`};
-			}
+		let callback=_(this).m_actions[action.name]||this.GetRuntime().Modules[action.name]?.Run;
+		if (typeof callback!=='function') throw new Error('Runtime function not found: '+String(action.name));
+		let value=await callback(args, {image, track, source});
+		let output=value&&typeof value==='object'&&'image' in value?value.image:value;
+		if (output&&typeof output.base64==='string'&&/^image\/(png|jpeg|webp)$/.test(output.mimeType)) {
+			let dimensions=await _(this).m_images.GetDimensions(output);
+			return {message: typeof value.message==='string'?value.message:`${action.name} updated the current image.`, image: {
+				...image, id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
+				, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
+				, ...dimensions
+				, prompt: `Local runtime edit: ${action.name}`
+				, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+				, aspectRatio: _(this).m_images.GetAspectRatio(dimensions)
+				, title: output.title||`${image?.title||'Image'} · ${action.name}`
+			}};
 		}
+		if (value&&typeof value.message==='string') return value;
+		return {message: `${action.name}: ${(typeof value==='string'?value:JSON.stringify(value)??'completed').slice(0,12000)}`};
 	};
 
 	_['public'].componentDidMount=function () {
 		let $this=_(this);
 		$this.GetRuntime();
-		$this.m_click=(event)=>$this.HandleClick(event);
 		$this.m_input=(event)=>{
 			if (event.target===$this.Node('input')) $this.m_state.inputText=event.target.value;
 		};
@@ -382,38 +359,25 @@ var CustomAgent=Function.extend(React.Component, function () {
 			}
 		};
 		let root=$this.m_root.current;
-		root.addEventListener('click', $this.m_click);
+		let bind=(selector, callback)=>{
+			for (let element of root.querySelectorAll(selector)) {
+				element.addEventListener('click', callback);
+				$this.m_clickBindings.push([element, callback]);
+			}
+		};
+		bind('[data-action="send"]', ()=>$this.m_state.isConsulting?$this.m_owner.Stop():$this.Send());
+		bind('[data-action="select"]', ()=>$this.SelectMedia());
+		bind('[data-action="camera"]', ()=>$this.CaptureCamera());
+		bind('[data-action="download"]', ()=>$this.Download());
+		bind('[data-action="generate"]', ()=>$this.Generate());
+		bind('[data-action="info"]', ()=>$this.Node('dialog').style.display='flex');
+		bind('[data-action="close-info"]', ()=>$this.Node('dialog').style.display='none');
+		bind('[data-action="copy-prompt"]', ()=>navigator.clipboard.writeText($this.m_state.generationPrompt||''));
+		for (let button of root.querySelectorAll('[data-ratio]')) bind(`[data-ratio="${button.dataset.ratio}"]`, ()=>$this.SetValues({selectedRatio: button.dataset.ratio}));
 		root.addEventListener('input', $this.m_input);
 		root.addEventListener('keydown', $this.m_key);
 		$this.Update();
 		$this.m_assistant=new Assistant(this);
-	};
-
-	_['private'].HandleClick=function (event) {
-		let $this=this;
-		let node=event.target.closest('[data-action],[data-ratio],[data-version]');
-		if (!node||!this.m_root.current.contains(node)) return;
-		if (node.dataset.ratio) { this.SetValues({selectedRatio: node.dataset.ratio}); return; }
-		if (node.dataset.version) {
-			let image=this.m_state.history.find((item)=>item.id===node.dataset.version);
-			if (image) this.SetValues({activeImage: image});
-			return;
-		}
-		switch (node.dataset.action) {
-			case 'send': $this.m_state.isConsulting?$this.m_owner.Stop():$this.Send(); break;
-			case 'select': $this.SelectMedia(); break;
-			case 'camera': $this.CaptureCamera(); break;
-			case 'download': $this.Download(); break;
-			case 'generate': $this.Generate(); break;
-			case 'info': $this.Node('dialog').style.display='flex'; break;
-			case 'close-info': $this.Node('dialog').style.display='none'; break;
-			case 'copy-prompt': navigator.clipboard.writeText(this.m_state.generationPrompt||''); break;
-			case 'copy-message-prompt': {
-				let message=this.m_state.messages.find((item)=>item.id===node.dataset.messageId);
-				if (message?.suggestedPrompt) navigator.clipboard.writeText(message.suggestedPrompt);
-				break;
-			}
-		}
 	};
 
 	_['private'].Update=function () {
@@ -465,9 +429,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 					prompt.textContent=this.m_owner.Text('promptDraft')+message.suggestedPrompt;
 					item.appendChild(prompt);
 					let copy=document.createElement('button');
-					copy.dataset.action='copy-message-prompt';
-					copy.dataset.messageId=message.id;
 					copy.textContent=this.m_owner.Text('copy');
+					copy.onclick=()=>navigator.clipboard.writeText(message.suggestedPrompt);
 					item.appendChild(copy);
 				}
 				return item;
@@ -492,6 +455,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 				let button=document.createElement('button');
 				button.dataset.version=image.id;
 				button.title=image.title;
+				button.onclick=()=>this.m_owner.SelectVersion(image.id);
 				let thumbnail=document.createElement('img');
 				thumbnail.src=`data:${image.mimeType};base64,${image.base64}`;
 				thumbnail.alt=image.title;
@@ -513,16 +477,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.AddMessage('user', message);
 		$this.SetValues({inputText: '', isConsulting: true});
 		try {
-			let handler=$this.m_handler;
-			if (handler) {
-				try { await handler(message, this, turn); }
-				catch (error) {
-					if ($this.m_handler===handler) $this.m_handler=null;
-					throw error;
-				}
-			}
-			else if ($this.m_messageListener) await $this.m_messageListener(message, turn);
-			else throw new Error('Assistant is unavailable.');
+			if (!$this.m_messageListener) throw new Error('Assistant is unavailable.');
+			await $this.m_messageListener(message, turn);
 		}
 		catch (error) { if (!turn.cancelled) await this.NotifyAssistant('Conversation failed', {Error: error.message||String(error)}); }
 		finally {
@@ -581,7 +537,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		this.Stop();
 		let root=$this.m_root.current;
-		root?.removeEventListener('click', $this.m_click);
+		for (let [element, callback] of $this.m_clickBindings) element.removeEventListener('click', callback);
 		root?.removeEventListener('input', $this.m_input);
 		root?.removeEventListener('keydown', $this.m_key);
 		$this.m_assistant?.Destroy();
@@ -602,7 +558,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['private'].m_versions=null;
 	_['private'].m_mounted=null;
 	_['private'].m_listeners=null;
-	_['private'].m_handler=null;
+	_['private'].m_actions=null;
 	_['private'].m_messageListener=null;
 	_['private'].m_eventListener=null;
 	_['private'].m_startup=null;
@@ -616,7 +572,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['private'].m_lastHistory=null;
 	_['private'].m_activeTurn=null;
 	_['private'].m_locale=null;
-	_['private'].m_click=null;
+	_['private'].m_clickBindings=null;
 	_['private'].m_input=null;
 	_['private'].m_key=null;
 });
