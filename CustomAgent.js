@@ -316,9 +316,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (typeof name!=='string'||!/^[A-Za-z_$][\w$]*$/.test(name)) throw new Error('Provide a module name.');
 		if (typeof source!=='string'||!source.trim()) throw new Error('Provide module source or a script URL.');
 		if (typeof Type!=='function'||!(Type.prototype instanceof Resource)) throw new Error('Provide a Resource type for the module.');
-		if ($this.GetRuntime().Modules[name]) throw new Error('Use a new module name for updated code.');
-		let value=await new Type(name, source, readyMember);
 		let remote=Type===Resource.Module||Type.prototype instanceof Resource.Module;
+		if ($this.GetRuntime().Modules[name]) {
+			if (remote) return {message: name+' is already loaded.'};
+			throw new Error('Use a new module name for updated code.');
+		}
+		let value=await new Type(name, source, readyMember);
 		return $this.RegisterModule(name, value, source, remote, track);
 	};
 
