@@ -3,7 +3,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	CustomAgent=_[CustomAgent];
 
 	function CustomAgent(props) {
-		_['base'].apply(this, arguments)(function () {
+		_['base'].apply(this, arguments);
 		let $this=_(this);
 		$this.m_owner=this;
 		$this.m_root=React.createRef();
@@ -30,7 +30,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_images=new ImageService(Flow);
 		$this.m_lastMessages=null;
 		$this.m_lastHistory=null;
-		});
 	}
 
 	_['private'].Node=function (role) {

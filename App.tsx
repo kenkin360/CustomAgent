@@ -9,14 +9,13 @@ var App=Function.extend(React.Component, function () {
 	App=_[App];
 
 	function App(props) {
-		_['base'].apply(this, arguments)(function () {
+		_['base'].apply(this, arguments);
 		let $this=_(this);
 		$this.m_agent=null;
 		$this.m_error=null;
 		$this.m_loading=false;
 		$this.m_progress={File: '', Completed: 0, Total: Bundle.Config.length};
 		$this.m_reload=()=>_(this).Load(this);
-		});
 	}
 
 	_['public'].componentDidMount=function () {
