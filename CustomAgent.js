@@ -6,7 +6,10 @@ var CustomAgent=Function.extend(React.Component, function () {
 		_['base'].apply(this, arguments);
 		let $this=_(this);
 		$this.m_view=new View();
-		$this.m_session=new Session();
+		$this.m_state=new AgentState();
+		$this.m_listeners=new Set();
+		$this.m_activeTurn=null;
+		$this.m_ready=null;
 		$this.m_modules=new Modules(new Sources(props.SourceFiles, props.HostSourceUrl));
 	}
 
@@ -15,14 +18,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['private'].SetValues=function (patch) {
-		this.m_session.State.Apply(patch);
+		this.m_state.Apply(patch);
 		this.Update();
 		this.Notify();
 	};
 
 	_['private'].AddMessage=function (sender, text, fields={}) {
 		let $this=_(this);
-		$this.SetValues({messages: [...$this.m_session.State.Chat.Messages, {
+		$this.SetValues({messages: [...$this.m_state.Messages, {
 			id: `${sender}_${Date.now()}_${Math.random()}`
 			, sender
 			, text
@@ -41,15 +44,21 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].Localize=function () { _(this).m_view.Localize((key)=>this.Text(key)); };
 
 	_['public'].GetState=function () {
-		return _(this).m_session.State.ToSnapshot();
+		return _(this).m_state.ToSnapshot();
+	};
+
+	_['private'].ToLegacyMedia=async function (media) {
+		if (!media) return null;
+		let state=this.m_state;
+		return {...media.toJSON(), base64: media.Data?await media.ToBase64():undefined, mediaId: state.MediaIds.get(media.Id), title: state.Labels.get(media.Id)};
 	};
 
 	_['public'].GetImageInfo=async function () {
 		let $this=_(this);
-		let image=$this.m_session.State.Media.ActiveImage;
+		let image=$this.m_state.ActiveImage;
 		if (!image) return null;
-		let dimensions=await new ImageService().GetDimensions(JSON.parse(JSON.stringify(image)));
-		return {...dimensions, mimeType: image.Content.MimeType, title: image.Provenance.Title};
+		let dimensions=image.Width&&image.Height?{width: image.Width, height: image.Height}:await new ImageService().GetDimensions(await $this.ToLegacyMedia(image));
+		return {...dimensions, mimeType: image.MimeType, title: $this.m_state.Labels.get(image.Id)};
 	};
 
 	_['public'].Reply=function (text, fields={}) {
@@ -71,13 +80,13 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].Subscribe=function (listener) {
 		let $this=_(this);
-		$this.m_session.Listeners.add(listener);
+		$this.m_listeners.add(listener);
 		listener(this.GetState());
-		return ()=>$this.m_session.Listeners.delete(listener);
+		return ()=>$this.m_listeners.delete(listener);
 	};
 
 	_['public'].Notify=function () {
-		for (let listener of _(this).m_session.Listeners) {
+		for (let listener of _(this).m_listeners) {
 			try { listener(this.GetState()); }
 			catch (error) { console.error('App subscriber failed:', error); }
 		}
@@ -86,7 +95,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].UpdateConversation=function (patch) { _(this).SetValues(patch); };
 	_['public'].ResetConversation=function () {
 		let $this=_(this);
-		if ($this.m_session.State.Media.IsGenerating) throw new Error('Wait for image generation to finish before resetting the conversation.');
+		if ($this.m_state.IsGenerating) throw new Error('Wait for image generation to finish before resetting the conversation.');
 		$this.SetValues({messages: [], accumulatedChanges: [], generationPrompt: '', inputText: ''});
 	};
 	_['public'].SetInput=function (value) { this.UpdateConversation({inputText: value}); };
@@ -96,31 +105,31 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 	_['public'].SelectVersion=function (id) {
 		let $this=_(this);
-		let image=$this.m_session.State.Media.History.find((item)=>item.Id===id);
+		let image=$this.m_state.History.find((item)=>item.Id===id);
 		if (!image) throw new Error('Image version not found: '+id);
 		$this.SetValues({activeImage: image, currentArtifact: image});
 	};
 	_['public'].SendMessage=function (text) { return this.Send(text); };
 	_['public'].Stop=function () {
 		let $this=_(this);
-		if (!$this.m_session.ActiveTurn) return;
-		$this.m_session.ActiveTurn.Cancelled=true;
-		$this.m_session.ActiveTurn=null;
+		if (!$this.m_activeTurn) return;
+		$this.m_activeTurn.abort();
+		$this.m_activeTurn=null;
 		$this.SetValues({isConsulting: false});
 	};
 	_['public'].PickMedia=function () { return this.SelectMedia(); };
 	_['public'].RunAction=async function (action, track=true, source, Type) {
 		let $this=_(this);
 		await $this.m_modules.GetStartup();
-		let state=$this.m_session.State.Media;
-		let image=state.ActiveImage?JSON.parse(JSON.stringify(state.ActiveImage)):null;
-		let artifact=state.CurrentArtifact?JSON.parse(JSON.stringify(state.CurrentArtifact)):null;
+		let state=$this.m_state;
+		let image=await $this.ToLegacyMedia(state.ActiveImage);
+		let artifact=await $this.ToLegacyMedia(state.CurrentArtifact);
 		let result=await $this.ExecuteAction(action, {image, artifact, track, source, Type});
 		if (result.artifact) {
 			let artifact=result.artifact;
 			$this.SetValues({
 				currentArtifact: artifact
-				, ...('image'===artifact.kind?{activeImage: artifact, history: [artifact, ...$this.m_session.State.Media.History]}:{})
+				, ...('image'===artifact.kind?{activeImage: artifact, history: [artifact, ...$this.m_state.History]}:{})
 			});
 		}
 		return result;
@@ -203,54 +212,54 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].componentDidMount=function () {
 		let $this=_(this);
 		$this.GetRuntime().UI=this;
-		let root=$this.m_view.GetRef().current;
+		let root=$this.m_view.GetRoot();
 		root.onclick=(event)=>{
 			let target=event.target.closest?.('[data-action],[data-ratio]');
 			if (!target||!root.contains(target)) return;
 			if (target.dataset.ratio) { $this.SetRatio(target.dataset.ratio); return; }
 			switch (target.dataset.action) {
-				case 'send': $this.m_session.State.Chat.IsConsulting?$this.Stop():$this.Send(); break;
+				case 'send': $this.m_state.IsConsulting?$this.Stop():$this.Send(); break;
 				case 'select': $this.SelectMedia(); break;
 				case 'camera': $this.CaptureCamera(); break;
 				case 'download': $this.Download(); break;
 				case 'generate': $this.Generate(); break;
 				case 'info': new HtmlNode($this.Node('dialog')).SetStyle('display', 'flex'); break;
 				case 'close-info': new HtmlNode($this.Node('dialog')).SetStyle('display', 'none'); break;
-				case 'copy-prompt': navigator.clipboard.writeText($this.m_session.State.Draft.GenerationPrompt||''); break;
+				case 'copy-prompt': navigator.clipboard.writeText($this.m_state.GenerationPrompt||''); break;
 			}
 		};
 		root.oninput=(event)=>{
-			if (event.target===$this.Node('input')) $this.m_session.State.Chat.InputText=event.target.value;
+			if (event.target===$this.Node('input')) $this.m_state.InputText=event.target.value;
 		};
 		root.onkeydown=(event)=>{
 			if (event.target===$this.Node('input')&&'Enter'===event.key&&!event.shiftKey&&!event.isComposing) {
 				event.preventDefault();
-				if (!$this.m_session.State.Chat.IsConsulting) $this.Send();
+				if (!$this.m_state.IsConsulting) $this.Send();
 			}
 		};
 		$this.Update();
-		$this.m_session.Ready=$this.Welcome();
+		$this.m_ready=$this.Welcome();
 	};
 
 	_['private'].Update=function () {
-		this.m_view.Update(this.m_session.State, (key)=>this.Text(key), (id)=>this.SelectVersion(id));
+		this.m_view.Update(this.m_state, (key)=>this.Text(key), (id)=>this.SelectVersion(id));
 	};
 
 	_['public'].Send=async function (text) {
 		let $this=_(this);
-		let message=String(text??$this.m_session.State.Chat.InputText).trim();
-		if (!message||$this.m_session.State.Chat.IsConsulting) return;
-		let turn=new Turn();
-		$this.m_session.ActiveTurn=turn;
+		let message=String(text??$this.m_state.InputText).trim();
+		if (!message||$this.m_state.IsConsulting) return;
+		let turn=new AbortController();
+		$this.m_activeTurn=turn;
 		$this.AddMessage('user', message);
 		$this.SetValues({inputText: '', isConsulting: true});
 		try {
 			await $this.HandleMessage(message, turn);
 		}
-		catch (error) { if (!turn.Cancelled) await this.NotifyAssistant('Conversation failed', {Error: error.message||String(error)}); }
+		catch (error) { if (!turn.signal.aborted) await this.NotifyAssistant('Conversation failed', {Error: error.message||String(error)}); }
 		finally {
-			if ($this.m_session.ActiveTurn===turn) {
-				$this.m_session.ActiveTurn=null;
+			if ($this.m_activeTurn===turn) {
+				$this.m_activeTurn=null;
 				$this.SetValues({isConsulting: false});
 			}
 		}
@@ -261,7 +270,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		try {
 			let image=await new ImageService().Select();
 			if (!image) return;
-			$this.SetValues({activeImage: image, currentArtifact: new ImageArtifact(image), history: [image, ...$this.m_session.State.Media.History]});
+			$this.SetValues({activeImage: image, currentArtifact: image, history: [image, ...$this.m_state.History]});
 			await this.NotifyAssistant('Media selected', {Title: image.title, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -272,7 +281,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		try {
 			let image=await new ImageService().Capture();
 			if (!image) return;
-			$this.SetValues({activeImage: image, currentArtifact: new ImageArtifact(image), history: [image, ...$this.m_session.State.Media.History]});
+			$this.SetValues({activeImage: image, currentArtifact: image, history: [image, ...$this.m_state.History]});
 			await this.NotifyAssistant('Camera image captured', {Title: image.title, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -280,14 +289,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].Generate=async function (prompt) {
 		let $this=_(this);
-		let state=$this.m_session.State;
-		let text=String(prompt||state.Draft.GenerationPrompt).trim();
-		if (!text||state.Media.IsGenerating) return;
+		let state=$this.m_state;
+		let text=String(prompt||state.GenerationPrompt).trim();
+		if (!text||state.IsGenerating) return;
 		$this.SetValues({isGenerating: true});
 		try {
-			let generated=await new ImageService().Generate(text, state.Media.ActiveImage?JSON.parse(JSON.stringify(state.Media.ActiveImage)):null, state.Draft.SelectedRatio, state.Media.History.length+1);
+			let generated=await new ImageService().Generate(text, state.ActiveImage?await $this.ToLegacyMedia(state.ActiveImage):null, state.SelectedRatio, state.History.length+1);
 			let image=generated.Image;
-			$this.SetValues({activeImage: image, currentArtifact: new ImageArtifact(image), history: [image, ...state.Media.History]});
+			$this.SetValues({activeImage: image, currentArtifact: image, history: [image, ...state.History]});
 			await this.NotifyAssistant('Image generation completed', {Title: image.title, Prompt: text, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -296,23 +305,24 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].Download=async function () {
 		let $this=_(this);
-		try { await new ImageService().Download(JSON.parse(JSON.stringify($this.m_session.State.Media.ActiveImage))); }
+		try { await new ImageService().Download(await $this.ToLegacyMedia($this.m_state.ActiveImage)); }
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
 
 	_['public'].componentWillUnmount=function () {
 		let $this=_(this);
 		this.Stop();
-		let root=$this.m_view.GetRef().current;
+		let root=$this.m_view.GetRoot();
 		if (root) root.onclick=root.oninput=root.onkeydown=null;
 		let runtime=this.GetRuntime();
 		if (runtime.UI===this) delete runtime.UI;
 		for (let name of this.Mounted()) this.Unmount(name);
-		$this.m_session.Listeners.clear();
+		$this.m_view.Dispose();
+		$this.m_listeners.clear();
 	};
 
 	_['public'].render=function () {
-		return React.createElement('div', {ref: _(this).m_view.GetRef(), style: {height: '100%', width: '100%'}, dangerouslySetInnerHTML: {__html: agentTemplate}});
+		return React.createElement('div', {ref: (element)=>_(this).m_view.SetRoot(element), style: {height: '100%', width: '100%'}, dangerouslySetInnerHTML: {__html: agentTemplate}});
 	};
 
 	_['private'].Welcome=async function () {
@@ -423,13 +433,13 @@ generateVideo 可由使用者提出影片生成要求時執行，參數為 {prom
 
 	_['private'].HandleMessage=async function (message, turn) {
 		let $this=_(this);
-		await $this.m_session.Ready;
-		if (turn?.Cancelled) return;
+		await $this.m_ready;
+		if (turn?.signal.aborted) return;
 
 		let app=$this;
 		let initial=app.GetState();
 		let imageInfo=await app.GetImageInfo();
-		if (turn?.Cancelled) return;
+		if (turn?.signal.aborted) return;
 
 		let prior=initial.messages.slice();
 		if (prior.at(-1)?.sender==='user'&&prior.at(-1)?.text===message) prior.pop();
@@ -452,7 +462,7 @@ Current user message:
 ${message}
 `;
 
-		let image=!artifact||'image'===artifact.kind?initial.activeImage:null;
+		let image=!artifact||'image'===artifact.kind?await $this.ToLegacyMedia($this.m_state.ActiveImage):null;
 		let changesOut=initial.accumulatedChanges;
 		let promptOut=initial.generationPrompt;
 		let ratioOut=initial.selectedRatio;
@@ -464,7 +474,7 @@ ${message}
 		let runtime=await app.InspectRuntime({});
 
 		for (;;) {
-			if (turn?.Cancelled) return;
+			if (turn?.signal.aborted) return;
 
 			let request=reports.length?`
 ${question()}
@@ -478,7 +488,7 @@ Choose the next action, revise the plan, or answer the user based on the actual 
 			if (image) options.images=[{base64: image.base64, mimeType: image.mimeType}];
 
 			let response=await Flow.generate.text(`${request}. `, options);
-			if (turn?.Cancelled) return;
+			if (turn?.signal.aborted) return;
 
 			let control=$this.ReadControl(response.text);
 			answer=control.Text;
@@ -509,16 +519,16 @@ Choose the next action, revise the plan, or answer the user based on the actual 
 			}
 
 			try {
-				if (turn?.Cancelled) return;
+				if (turn?.signal.aborted) return;
 
 				let result=await app.RunAction(action, true, control.Source, control.Type);
-				if (turn?.Cancelled) return;
+				if (turn?.signal.aborted) return;
 
 				if (result.conversationReset) {
 					let fresh=await Flow.generate.text('.', {systemInstruction: `
 App 已清空對話。以使用者這次要求的語言自然回覆。
 `});
-					if (turn?.Cancelled) return;
+					if (turn?.signal.aborted) return;
 					if (!fresh.text?.trim()) throw new Error('The model returned an empty answer.');
 					app.Reply(fresh.text.trim());
 					return;
@@ -566,12 +576,12 @@ Summarize these results and answer the user in natural language.
 			let response=await Flow.generate.text(`${prompt}. `, {systemInstruction: `
 依使用者的語言，以 App 回報的結果為依據回答。
 `});
-			if (turn?.Cancelled) return;
+			if (turn?.signal.aborted) return;
 			answer=response.text?.trim();
 		}
 
 		if (!answer) throw new Error('The model returned an empty answer me.');
-		if (turn?.Cancelled) return;
+		if (turn?.signal.aborted) return;
 
 		if (structured) {
 			app.UpdateConversation({
@@ -596,7 +606,7 @@ Summarize these results and answer the user in natural language.
 	};
 
 	_['private'].Report=async function (event, details={}, image) {
-		await _(this).m_session.Ready;
+		await _(this).m_ready;
 
 		let messages=this.GetState().messages.slice(-8)
 			.map((entry)=>`${entry.sender}: ${entry.text}`)
@@ -617,7 +627,10 @@ Reply briefly to the user in the language of the current conversation.
 		this.Reply(response.text.trim(), image?{includedImage: image}:{});
 	};
 
-	_['private'].m_session=null;
+	_['private'].m_state=null;
+	_['private'].m_listeners=null;
+	_['private'].m_activeTurn=null;
+	_['private'].m_ready=null;
 	_['private'].m_view=null;
 	_['private'].m_modules=null;
 });

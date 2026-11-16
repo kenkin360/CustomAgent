@@ -42,12 +42,14 @@ var VideoService=Function.extend(Object, function () {
 			, ...(sourceVideoMediaId?{sourceVideoMediaId}:{})
 		});
 		if ('string'!==typeof result?.mediaId||!result.mediaId) throw new Error('Flow did not return a saved video mediaId.');
+		let content='string'===typeof result.base64?result:await Flow.media.getBase64({mediaId: result.mediaId});
+		if ('string'!==typeof content?.base64||!content.base64) throw new Error('Flow did not return the generated video content.');
 		return {
 			kind: 'video'
 			, id: `video_${Date.now()}_${Math.random().toString(36).slice(2)}`
 			, mediaId: result.mediaId
-			, mimeType: result.mimeType
-			, ...('string'===typeof result.base64?{base64: result.base64}:{})
+			, mimeType: content.mimeType||result.mimeType
+			, base64: content.base64
 			, prompt: prompt.trim()
 			, title: result.name||'Generated video'
 			, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})

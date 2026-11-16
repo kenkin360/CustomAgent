@@ -7,18 +7,18 @@ var HistoryList=Function.extend(Object, function () {
 		$this.m_lastHistory=null;
 		$this.m_lastNode=null;
 	}
-	_['public'].Update=function (area, state, select) {
+	_['public'].Update=function (area, state, select, url) {
 		let $this=_(this);
 		if (!area) { $this.m_lastNode=null; return; }
 		if (state.History!==$this.m_lastHistory||area!==$this.m_lastNode) {
 			area.replaceChildren(...state.History.map((image)=>{
 				let button=document.createElement('button');
 				button.dataset.version=image.Id;
-				button.title=image.Provenance.Title;
+				button.title=state.Labels.get(image.Id)||'Image';
 				button.onclick=()=>select(image.Id);
 				let thumbnail=document.createElement('img');
-				thumbnail.src=`data:${image.Content.MimeType};base64,${image.Content.Base64}`;
-				thumbnail.alt=image.Provenance.Title;
+				thumbnail.src=url(image);
+				thumbnail.alt=state.Labels.get(image.Id)||'Image';
 				button.appendChild(thumbnail);
 				return button;
 			}));

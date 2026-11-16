@@ -6,7 +6,7 @@ var Modules=Function.extend(Object, function () {
 		let $this=_(this);
 		$this.m_sources=sources;
 		$this.m_versions=[];
-		$this.m_dynamic=[];
+		$this.m_dynamic=new Map();
 		$this.m_startup=null;
 	}
 	_['public'].GetSources=function () { return _(this).m_sources; };
@@ -80,11 +80,11 @@ var Modules=Function.extend(Object, function () {
 	};
 	_['public'].RecordDynamic=function (name) {
 		let dynamic=_(this).m_dynamic;
-		if (!dynamic.some((entry)=>entry.Name===name)) dynamic.push(new DynamicModule(name));
+		if (!dynamic.has(name)) dynamic.set(name, new Date().toLocaleTimeString());
 	};
 	_['public'].DescribeDynamic=function () {
 		let dynamic=_(this).m_dynamic;
-		return dynamic.length?dynamic.map((entry)=>`${entry.Name} (載入時間: ${entry.Time})`).join(', '):'(無)';
+		return dynamic.size?[...dynamic].map(([name, time])=>`${name} (載入時間: ${time})`).join(', '):'(無)';
 	};
 	_['private'].m_sources=null;
 	_['private'].m_versions=null;

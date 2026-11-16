@@ -29,7 +29,7 @@ var ImageService=Function.extend(Object, function () {
 		let output=value&&'object'===typeof value&&'image' in value?value.image:value;
 		if (!output||'string'!==typeof output.base64||!/^image\/(png|jpeg|webp)$/.test(output.mimeType)) return null;
 		let dimensions=await this.GetDimensions(output);
-		let original=image?JSON.parse(JSON.stringify(image)):{};
+		let original=image||{};
 		return {
 			...original, kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
 			, base64: output.base64, mimeType: output.mimeType, mediaId: undefined

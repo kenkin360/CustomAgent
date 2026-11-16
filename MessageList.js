@@ -8,7 +8,7 @@ var MessageList=Function.extend(Object, function () {
 		$this.m_lastNode=null;
 		$this.m_lastConsulting=null;
 	}
-	_['public'].Update=function (list, state, text) {
+	_['public'].Update=function (list, state, text, url) {
 		let $this=_(this);
 		if (!list) { $this.m_lastNode=null; return; }
 		if (state.Messages===$this.m_lastMessages&&state.IsConsulting===$this.m_lastConsulting&&list===$this.m_lastNode) return;
@@ -18,23 +18,23 @@ var MessageList=Function.extend(Object, function () {
 			let time=document.createElement('small');
 			time.textContent=('user'===message.Sender?text('you'):'system'===message.Sender?'App':text('agent'))+' · '+message.Timestamp;
 			item.appendChild(time);
-			if (message.Content.IncludedImage) {
+			if (message.IncludedImage) {
 				let preview=document.createElement('img');
-				preview.src=`data:${message.Content.IncludedImage.Content.MimeType};base64,${message.Content.IncludedImage.Content.Base64}`;
+				preview.src=url(message.IncludedImage);
 				preview.alt='Image result';
 				item.appendChild(preview);
 			}
 			let body=document.createElement('div');
 			body.textContent=message.Text;
 			item.appendChild(body);
-			if (message.Content.SuggestedPrompt) {
+			if (message.SuggestedPrompt) {
 				let prompt=document.createElement('div');
 				prompt.className='ca-prompt';
-				prompt.textContent=text('promptDraft')+message.Content.SuggestedPrompt;
+				prompt.textContent=text('promptDraft')+message.SuggestedPrompt;
 				item.appendChild(prompt);
 				let copy=document.createElement('button');
 				copy.textContent=text('copy');
-				copy.onclick=()=>navigator.clipboard.writeText(message.Content.SuggestedPrompt);
+				copy.onclick=()=>navigator.clipboard.writeText(message.SuggestedPrompt);
 				item.appendChild(copy);
 			}
 			return item;
