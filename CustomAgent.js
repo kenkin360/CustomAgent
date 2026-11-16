@@ -9,6 +9,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_root=React.createRef();
 		$this.m_state={
 			activeImage: null
+			, currentArtifact: null
 			, history: []
 			, messages: []
 			, inputText: ''
@@ -38,6 +39,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 				this.ResetConversation();
 				return {message: 'Conversation cleared.', conversationReset: true};
 			}
+			, generateVideo: (args, context)=>this.GenerateVideo(args, context)
 		});
 		$this.m_compiledSources=Object.create(null);
 		$this.m_compiledError=null;
@@ -45,6 +47,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		catch (error) { $this.m_compiledError=error; }
 		$this.m_installedSources=Object.create(null);
 		$this.m_images=new ImageService(Flow);
+		$this.m_videos=new VideoService(Flow);
 		$this.m_lastMessages=null;
 		$this.m_lastMessagesNode=null;
 		$this.m_lastConsulting=null;
@@ -161,7 +164,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		let image=$this.m_state.history.find((item)=>item.id===id);
 		if (!image) throw new Error('Image version not found: '+id);
-		$this.SetValues({activeImage: image});
+		$this.SetValues({activeImage: image, currentArtifact: {kind: 'image', ...image}});
 	};
 	_['public'].SendMessage=function (text) { return this.Send(text); };
 	_['public'].Stop=function () {
@@ -176,9 +179,33 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		await $this.m_startup;
 		let image=$this.m_state.activeImage;
-		let result=await $this.ExecuteAction(action, image, track, source, Type);
-		if (result.image) $this.SetValues({activeImage: result.image, history: [result.image, ...$this.m_state.history]});
+		let result=await $this.ExecuteAction(action, {image, artifact: $this.m_state.currentArtifact, track, source, Type});
+		if (result.artifact) {
+			let artifact=result.artifact;
+			$this.SetValues({
+				currentArtifact: artifact
+				, ...(artifact.kind==='image'?{activeImage: artifact, history: [artifact, ...$this.m_state.history]}:{})
+			});
+		}
 		return result;
+	};
+
+	_['public'].GenerateVideo=async function (args={}, context={}) {
+		let image=context.image;
+		if ((args.useCurrentImageAsFirstFrame||args.useCurrentImageAsReference)&&!image) throw new Error('No current image is available.');
+		if (args.useCurrentImageAsFirstFrame&&args.firstFrameImageMediaId) throw new Error('Choose one first-frame image.');
+		let references=args.referenceImageMediaIds||[];
+		if (!Array.isArray(references)) throw new Error('Reference image media IDs must be an array.');
+		let artifact=await _(this).m_videos.Generate({
+			prompt: args.prompt
+			, aspectRatio: args.aspectRatio
+			, durationSeconds: args.durationSeconds
+			, resolution: args.resolution
+			, firstFrameImage: args.useCurrentImageAsFirstFrame?image:args.firstFrameImageMediaId
+			, referenceImages: args.useCurrentImageAsReference?[image, ...references]:references
+			, sourceVideoMediaId: args.sourceVideoMediaId
+		});
+		return {message: `Video generated and saved to Flow Assets (${artifact.mediaId}).`, artifact};
 	};
 
 	_['public'].InspectRuntime=function (args={}) {
@@ -324,25 +351,23 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 	};
 
-	_['private'].ExecuteAction=async function (action, image, track=true, source, Type) {
+	_['private'].ExecuteAction=async function (action, context) {
 		if (!action?.arguments||typeof action.arguments!=='object'||Array.isArray(action.arguments)) throw new Error('Action arguments must be an object.');
 		let args=action.arguments;
 		let callback=_(this).m_actions[action.name]||this.GetRuntime().Modules[action.name]?.Run;
 		if (typeof callback!=='function') throw new Error('Runtime function not found: '+String(action.name));
-		let value=await callback(args, {image, track, source, Type});
-		let output=value&&typeof value==='object'&&'image' in value?value.image:value;
-		if (output&&typeof output.base64==='string'&&/^image\/(png|jpeg|webp)$/.test(output.mimeType)) {
-			let dimensions=await _(this).m_images.GetDimensions(output);
-			return {message: typeof value.message==='string'?value.message:`${action.name} updated the current image.`, image: {
-				...image, id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
-				, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
-				, ...dimensions
-				, prompt: `Local runtime edit: ${action.name}`
-				, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-				, aspectRatio: _(this).m_images.GetAspectRatio(dimensions)
-				, title: output.title||`${image?.title||'Image'} · ${action.name}`
-			}};
+		let value=await callback(args, context);
+		if (value?.artifact!==undefined) {
+			if (!value.artifact||typeof value.artifact!=='object'||typeof value.artifact.kind!=='string'||!value.artifact.kind) throw new Error('An action artifact needs a kind.');
+			if (value.artifact.kind==='image') {
+				let image=await _(this).m_images.ReadActionResult({image: value.artifact}, context.image, action.name);
+				if (!image) throw new Error('An image artifact needs supported image content.');
+				return {message: typeof value.message==='string'?value.message:`${action.name} updated the current image.`, artifact: image, image};
+			}
+			return {message: typeof value.message==='string'?value.message:`${action.name} completed.`, artifact: value.artifact};
 		}
+		let image=await _(this).m_images.ReadActionResult(value, context.image, action.name);
+		if (image) return {message: typeof value.message==='string'?value.message:`${action.name} updated the current image.`, artifact: image, image};
 		if (value&&typeof value.message==='string') return value;
 		return {message: `${action.name}: ${(typeof value==='string'?value:JSON.stringify(value)??'completed').slice(0,12000)}`};
 	};
@@ -500,7 +525,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		try {
 			let image=await $this.m_images.Select();
 			if (!image) return;
-			$this.SetValues({activeImage: image, history: [image, ...$this.m_state.history]});
+			$this.SetValues({activeImage: image, currentArtifact: {kind: 'image', ...image}, history: [image, ...$this.m_state.history]});
 			await this.NotifyAssistant('Media selected', {Title: image.title, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -511,7 +536,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		try {
 			let image=await $this.m_images.Capture();
 			if (!image) return;
-			$this.SetValues({activeImage: image, history: [image, ...$this.m_state.history]});
+			$this.SetValues({activeImage: image, currentArtifact: {kind: 'image', ...image}, history: [image, ...$this.m_state.history]});
 			await this.NotifyAssistant('Camera image captured', {Title: image.title, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -526,7 +551,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		try {
 			let generated=await $this.m_images.Generate(text, state.activeImage, state.selectedRatio, state.history.length+1);
 			let image=generated.Image;
-			$this.SetValues({activeImage: image, history: [image, ...state.history]});
+			$this.SetValues({activeImage: image, currentArtifact: {kind: 'image', ...image}, history: [image, ...state.history]});
 			await this.NotifyAssistant('Image generation completed', {Title: image.title, Prompt: text, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -652,9 +677,16 @@ ${runtime.message}
 readCompiledSource 空參數列出啟動時已完整拆解的固定 host 檔案，{file} 取得完整原碼；readRemoteSource 空參數列出 Bundle.Config 等遠端來源，{name} 可重新取得其內容；readInstalledSource 空參數列出已安裝模組，{name} 取得安裝時保留的完整原碼，遠端安裝者可重新取得。inspectRuntime 檢查現有函數、模組及原碼入口。
 loadModule 接收獨立的 JavaScript 程式碼或遠端腳本 URL。需要載入時，先輸出 javascript 程式碼區塊（原碼）或 text 程式碼區塊（URL），再於答覆最後輸出操作控制 JSON，其 localAction 為 {"name":"loadModule","arguments":{"name":"模組名稱"}}，並在 attemptPlan 列出 loadModule。自行撰寫類型時，以頂層 var 和 Function.extend(Base, factory) 宣告，將建構子、方法及靜態成員寫在類別定義內；需要完整範例時，可透過 readInstalledSource 查看 DrawRectangle 原碼。可呼叫的模組提供靜態 Run。
 直接以模組名稱作為操作名稱呼叫其 Run；rollback 撤銷上一項模組安裝；resetConversation 清空對話。需要實作新功能時可讀程式碼並撰寫、載入模組。
-可用模組可使用瀏覽器標準 API，操作目前影像時，模組的 Run 收到參數與 {image}，回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。
+generateVideo 可由使用者提出影片生成要求時執行，參數為 {prompt,aspectRatio,durationSeconds,resolution}；aspectRatio 為 16:9 或 9:16，durationSeconds 為 3 至 15，resolution 為 720p 或 360p。可選 useCurrentImageAsFirstFrame: true 作為首幀，或 useCurrentImageAsReference: true 作為參考；也可傳 firstFrameImageMediaId、referenceImageMediaIds，或 sourceVideoMediaId 作為影片編輯來源。首幀不得與參考圖或來源影片同時使用。完成後影片自動存入 Flow Assets，目前沒有影片播放 UI。
+可用模組可使用瀏覽器標準 API，Run 收到參數與 {artifact,image,track,source,Type}；有產物時回傳 {message,artifact:{kind,...}}，其中 artifact.kind 指出產物類型，影片可保留 mediaId、mimeType 與時長。既有影像模組仍可回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。
 若有待使用者確認的生成修改，可於 JSON 加入 accumulatedChanges、suggestedPrompt、aspectRatio。操作結果與錯誤由 App 回傳；答覆使用者時以自然語言說明結果。
 `;
+	};
+
+	_['private'].DescribeArtifact=function (artifact) {
+		if (!artifact) return null;
+		let {kind, id, title, mimeType, mediaId, width, height, durationSeconds}=artifact;
+		return {kind, id, title, mimeType, mediaId, width, height, durationSeconds};
 	};
 
 	_['private'].HandleMessage=async function (message, turn) {
@@ -675,8 +707,10 @@ loadModule 接收獨立的 JavaScript 程式碼或遠端腳本 URL。需要載�
 			?initial.accumulatedChanges.map((entry, index)=>`${index+1}. ${entry}`).join('\n')
 			:'(none)';
 
+		let artifact=initial.currentArtifact;
 		let question=()=>`
 Current image: ${imageInfo?`${imageInfo.width} × ${imageInfo.height} pixels (${imageInfo.mimeType})`:'none'}
+Current artifact: ${JSON.stringify($this.DescribeArtifact(artifact))}
 Selected generation aspect ratio: ${initial.selectedRatio}
 Pending generation changes:
 ${changes}
@@ -686,7 +720,7 @@ Current user message:
 ${message}
 `;
 
-		let image=initial.activeImage;
+		let image=!artifact||artifact.kind==='image'?initial.activeImage:null;
 		let changesOut=initial.accumulatedChanges;
 		let promptOut=initial.generationPrompt;
 		let ratioOut=initial.selectedRatio;
@@ -758,14 +792,14 @@ App 已清空對話。以使用者這次要求的語言自然回覆。
 					return;
 				}
 
-				if (result.image) {
-					image=result.image;
-					imageInfo={
-						width: image.width
-						, height: image.height
-						, mimeType: image.mimeType
-					};
-					edited=result.image;
+				if (result.artifact) {
+					artifact=result.artifact;
+					image=artifact.kind==='image'?artifact:null;
+					if (image) {
+						imageInfo={width: image.width, height: image.height, mimeType: image.mimeType};
+						edited=image;
+					}
+					else edited=null;
 				}
 
 				if (action.name==='loadModule') {
@@ -782,13 +816,7 @@ App 已清空對話。以使用者這次要求的語言自然回覆。
 					action: action.name
 					, status: 'success'
 					, result: result.message
-					, ...(result.image?{
-						image: {
-							width: result.image.width
-							, height: result.image.height
-							, mimeType: result.image.mimeType
-						}
-					}:{})
+					, ...(result.artifact?{artifact: $this.DescribeArtifact(result.artifact)}:{})
 				});
 				runtime=await app.InspectRuntime({});
 			}
@@ -830,6 +858,7 @@ Summarize these results and answer the user in natural language.
 			accumulatedChanges: changesOut
 			, suggestedPrompt: promptOut||undefined
 			, aspectRatio: ratioOut
+			, ...(artifact?.kind==='video'?{includedArtifact: $this.DescribeArtifact(artifact)}:{})
 			, ...(edited?{
 				includedImage: {
 					base64: edited.base64
@@ -876,6 +905,7 @@ Reply briefly to the user in the language of the current conversation.
 	_['private'].m_compiledError=null;
 	_['private'].m_installedSources=null;
 	_['private'].m_images=null;
+	_['private'].m_videos=null;
 	_['private'].m_lastMessages=null;
 	_['private'].m_lastMessagesNode=null;
 	_['private'].m_lastConsulting=null;
