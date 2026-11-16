@@ -46,8 +46,10 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_installedSources=Object.create(null);
 		$this.m_images=new ImageService(Flow);
 		$this.m_lastMessages=null;
+		$this.m_lastMessagesNode=null;
 		$this.m_lastConsulting=null;
 		$this.m_lastHistory=null;
+		$this.m_lastHistoryNode=null;
 		$this.m_activeTurn=null;
 		$this.m_clickBindings=[];
 		$this.m_locale=(navigator.languages||[]).find((language)=>/^zh\b/i.test(language))?'zh':/^zh\b/i.test(navigator.language||'')?'zh':'en';
@@ -384,29 +386,31 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let state=this.m_state;
 		let root=this.m_root.current;
 		if (!root) return;
-		let picture=this.Node('image');
+		let node=(role)=>new HtmlNode(this.Node(role));
+		let picture=node('image');
+		let image=picture.GetElement();
 		if (state.activeImage) {
 			let url=`data:${state.activeImage.mimeType};base64,${state.activeImage.base64}`;
-			if (picture.src!==url) picture.src=url;
-			picture.hidden=false;
+			if (image&&image.src!==url) picture.SetSource(url);
+			picture.Show(true);
 		}
-		else picture.hidden=true;
-		this.Node('empty').style.display=state.activeImage?'none':'block';
-		this.Node('image-ratio').textContent=state.activeImage?.width&&state.activeImage?.height?`${state.activeImage.width} × ${state.activeImage.height}`:'';
-		this.Node('generating').style.display=state.isGenerating?'flex':'none';
+		else picture.Show(false);
+		node('empty').SetStyle('display', state.activeImage?'none':'block');
+		node('image-ratio').SetText(state.activeImage?.width&&state.activeImage?.height?`${state.activeImage.width} × ${state.activeImage.height}`:'');
+		node('generating').SetStyle('display', state.isGenerating?'flex':'none');
 		this.m_owner.Localize();
-		let sendButton=root.querySelector('[data-action="send"]');
-		sendButton.textContent=state.isConsulting?this.m_owner.Text('stop'):this.m_owner.Text('send');
-		let input=this.Node('input');
-		if (input.value!==state.inputText) input.value=state.inputText;
-		this.Node('pending').style.display=state.accumulatedChanges.length?'block':'none';
-		this.Node('pending-count').textContent=`${this.m_owner.Text('confirmedChanges')} (${state.accumulatedChanges.length})`;
-		this.Node('pending-list').textContent=state.accumulatedChanges.map((item, index)=>`${index+1}. ${item}`).join('\n');
-		this.Node('pending-list').style.whiteSpace='pre-wrap';
-		this.Node('pending-prompt').textContent=state.generationPrompt||'';
-		for (let button of this.Node('ratios').querySelectorAll('[data-ratio]')) button.classList.toggle('ca-selected', button.dataset.ratio===state.selectedRatio);
-		if (state.messages!==this.m_lastMessages||state.isConsulting!==this.m_lastConsulting) {
-			let list=this.Node('message-list');
+		new HtmlNode(root.querySelector('[data-action="send"]')).SetText(state.isConsulting?this.m_owner.Text('stop'):this.m_owner.Text('send'));
+		let input=node('input');
+		if (input.GetElement()?.value!==state.inputText) input.SetValue(state.inputText);
+		node('pending').SetStyle('display', state.accumulatedChanges.length?'block':'none');
+		node('pending-count').SetText(`${this.m_owner.Text('confirmedChanges')} (${state.accumulatedChanges.length})`);
+		node('pending-list').SetText(state.accumulatedChanges.map((item, index)=>`${index+1}. ${item}`).join('\n'));
+		node('pending-list').SetStyle('whiteSpace', 'pre-wrap');
+		node('pending-prompt').SetText(state.generationPrompt||'');
+		let ratios=node('ratios').GetElement();
+		for (let button of ratios?.querySelectorAll('[data-ratio]')||[]) button.classList.toggle('ca-selected', button.dataset.ratio===state.selectedRatio);
+		let list=node('message-list').GetElement();
+		if (list&&(state.messages!==this.m_lastMessages||state.isConsulting!==this.m_lastConsulting||list!==this.m_lastMessagesNode)) {
 			let items=state.messages.map((message)=>{
 				let item=document.createElement('div');
 				item.className=`ca-message ca-${message.sender}`;
@@ -445,11 +449,13 @@ var CustomAgent=Function.extend(React.Component, function () {
 			}
 			list.replaceChildren(...items);
 			this.m_lastMessages=state.messages;
+			this.m_lastMessagesNode=list;
 			this.m_lastConsulting=state.isConsulting;
 			(list.querySelector('.ca-thinking')||list.lastElementChild)?.scrollIntoView({block: 'nearest'});
 		}
-		if (state.history!==this.m_lastHistory) {
-			let area=this.Node('history');
+		if (!list) this.m_lastMessagesNode=null;
+		let area=node('history').GetElement();
+		if (area&&(state.history!==this.m_lastHistory||area!==this.m_lastHistoryNode)) {
 			area.replaceChildren(...state.history.map((image)=>{
 				let button=document.createElement('button');
 				button.dataset.version=image.id;
@@ -462,9 +468,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 				return button;
 			}));
 			this.m_lastHistory=state.history;
+			this.m_lastHistoryNode=area;
 		}
-		this.Node('history-count').textContent=state.history.length;
-		for (let button of this.Node('history').children) button.classList.toggle('ca-selected', button.dataset.version===state.activeImage?.id);
+		if (!area) this.m_lastHistoryNode=null;
+		node('history-count').SetText(state.history.length);
+		for (let button of area?.children||[]) button.classList.toggle('ca-selected', button.dataset.version===state.activeImage?.id);
 	};
 
 	_['public'].Send=async function (text) {
@@ -869,8 +877,10 @@ Reply briefly to the user in the language of the current conversation.
 	_['private'].m_installedSources=null;
 	_['private'].m_images=null;
 	_['private'].m_lastMessages=null;
+	_['private'].m_lastMessagesNode=null;
 	_['private'].m_lastConsulting=null;
 	_['private'].m_lastHistory=null;
+	_['private'].m_lastHistoryNode=null;
 	_['private'].m_activeTurn=null;
 	_['private'].m_locale=null;
 	_['private'].m_clickBindings=null;
