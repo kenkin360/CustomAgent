@@ -37,7 +37,6 @@ var Bundle=Function.extend(Function, function () {
 
 	Bundle.Config=[
 		['CustomAgent', Bundle.CustomAgent('CustomAgent.js')]
-		, ['Assistant', Bundle.CustomAgent('Assistant.js')]
 		, ['ImageService', Bundle.CustomAgent('ImageService.js')]
 		, ['cv', 'https://esm.sh/gh/TechStark/opencv-js/dist/opencv.js?raw', 'Mat']
 		, ['agentTemplate', Bundle.CustomAgent('views/agent.html.js')]
