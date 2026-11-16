@@ -18,7 +18,7 @@ var MessageList=Function.extend(Object, function () {
 			let time=document.createElement('small');
 			time.textContent=('user'===message.Sender?text('you'):'system'===message.Sender?'App':text('agent'))+' · '+message.Timestamp;
 			item.appendChild(time);
-			if (message.IncludedMedia) {
+			if (message.IncludedMedia instanceof Media.Image||message.IncludedMedia instanceof Media.Video) {
 				let preview=document.createElement(message.IncludedMedia instanceof Media.Video?'video':'img');
 				if (message.IncludedMedia instanceof Media.Video) {
 					preview.controls=true;

@@ -16,16 +16,19 @@ var HistoryList=Function.extend(Object, function () {
 				button.dataset.version=media.Id;
 				button.title=state.Labels.get(media.Id)||'Media';
 				button.onclick=()=>select(media.Id);
-				let thumbnail=document.createElement(media instanceof Media.Video?'video':'img');
+				let thumbnail=media instanceof Media.Image||media instanceof Media.Video?document.createElement(media instanceof Media.Video?'video':'img'):null;
 				if (media instanceof Media.Video) {
 					thumbnail.muted=true;
 					thumbnail.playsInline=true;
 					thumbnail.preload='metadata';
 					thumbnail.onloadedmetadata=()=>{ if (thumbnail.duration>0.1) thumbnail.currentTime=0.1; };
 				}
-				thumbnail.src=url(media);
-				if (media instanceof Media.Image) thumbnail.alt=state.Labels.get(media.Id)||'Media';
-				button.appendChild(thumbnail);
+				if (thumbnail) {
+					thumbnail.src=url(media);
+					if (media instanceof Media.Image) thumbnail.alt=state.Labels.get(media.Id)||'Media';
+					button.appendChild(thumbnail);
+				}
+				else button.textContent=media.MimeType;
 				return button;
 			}));
 			$this.m_lastHistory=state.History;
