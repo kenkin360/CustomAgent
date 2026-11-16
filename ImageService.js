@@ -30,7 +30,7 @@ var ImageService=Function.extend(Object, function () {
 		if (!output||'string'!==typeof output.base64||!/^image\/(png|jpeg|webp)$/.test(output.mimeType)) return null;
 		let dimensions=await this.GetDimensions(output);
 		return {
-			...(image?.ToJSON?image.ToJSON():image), kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
+			...(image?.toJSON?image.toJSON():image), kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
 			, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
 			, ...dimensions
 			, prompt: `Local runtime edit: ${actionName}`

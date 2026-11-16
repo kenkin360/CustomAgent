@@ -14,10 +14,9 @@ var Artifact=Function.extend(Object, function () {
 		if ('video'===value.kind) return new VideoArtifact(value);
 		return new Artifact(value);
 	};
-	_['public'].ToJSON=function () {
+	_['public'].toJSON=function () {
 		return {kind: this.Kind, id: this.Id, base64: this.Content.Base64, mimeType: this.Content.MimeType, mediaId: this.Content.MediaId, title: this.Provenance.Title, prompt: this.Provenance.Prompt, timestamp: this.Provenance.Timestamp};
 	};
-	_['public'].toJSON=function () { return this.ToJSON(); };
 	_['public'].Kind=null;
 	_['public'].Id=null;
 	_['public'].Content=null;

@@ -9,11 +9,10 @@ var Message=Function.extend(Object, function () {
 		this.Timestamp=value.timestamp;
 		this.Content=new MessageContent(value);
 	}
-	_['public'].ToJSON=function () {
+	_['public'].toJSON=function () {
 		let content=this.Content;
-		return {id: this.Id, sender: this.Sender, text: this.Text, timestamp: this.Timestamp, includedImage: content.IncludedImage?.ToJSON(), includedArtifact: content.IncludedArtifact?.ToJSON(), suggestedPrompt: content.SuggestedPrompt, aspectRatio: content.AspectRatio, accumulatedChanges: content.AccumulatedChanges};
+		return {id: this.Id, sender: this.Sender, text: this.Text, timestamp: this.Timestamp, includedImage: content.IncludedImage?.toJSON(), includedArtifact: content.IncludedArtifact?.toJSON(), suggestedPrompt: content.SuggestedPrompt, aspectRatio: content.AspectRatio, accumulatedChanges: content.AccumulatedChanges};
 	};
-	_['public'].toJSON=function () { return this.ToJSON(); };
 	_['public'].Id=null;
 	_['public'].Sender=null;
 	_['public'].Text=null;

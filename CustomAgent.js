@@ -48,7 +48,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		let image=$this.m_session.State.Media.ActiveImage;
 		if (!image) return null;
-		let dimensions=await new ImageService().GetDimensions(image.ToJSON());
+		let dimensions=await new ImageService().GetDimensions(image.toJSON());
 		return {...dimensions, mimeType: image.Content.MimeType, title: image.Provenance.Title};
 	};
 
@@ -112,8 +112,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].RunAction=async function (action, track=true, source, Type) {
 		let $this=_(this);
 		await $this.m_modules.GetStartup();
-		let image=$this.m_session.State.Media.ActiveImage?.ToJSON();
-		let result=await $this.ExecuteAction(action, {image, artifact: $this.m_session.State.Media.CurrentArtifact?.ToJSON(), track, source, Type});
+		let image=$this.m_session.State.Media.ActiveImage?.toJSON();
+		let result=await $this.ExecuteAction(action, {image, artifact: $this.m_session.State.Media.CurrentArtifact?.toJSON(), track, source, Type});
 		if (result.artifact) {
 			let artifact=result.artifact;
 			$this.SetValues({
@@ -283,7 +283,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (!text||state.Media.IsGenerating) return;
 		$this.SetValues({isGenerating: true});
 		try {
-			let generated=await new ImageService().Generate(text, state.Media.ActiveImage?.ToJSON(), state.Draft.SelectedRatio, state.Media.History.length+1);
+			let generated=await new ImageService().Generate(text, state.Media.ActiveImage?.toJSON(), state.Draft.SelectedRatio, state.Media.History.length+1);
 			let image=generated.Image;
 			$this.SetValues({activeImage: image, currentArtifact: new ImageArtifact(image), history: [image, ...state.Media.History]});
 			await this.NotifyAssistant('Image generation completed', {Title: image.title, Prompt: text, Width: image.width, Height: image.height}, image);
@@ -294,7 +294,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].Download=async function () {
 		let $this=_(this);
-		try { await new ImageService().Download($this.m_session.State.Media.ActiveImage?.ToJSON()); }
+		try { await new ImageService().Download($this.m_session.State.Media.ActiveImage?.toJSON()); }
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
 

@@ -17,14 +17,14 @@ var AgentState=Function.extend(Object, function () {
 		let draft=this.Draft;
 		let chat=this.Chat;
 		return {
-			activeImage: media.ActiveImage?.ToJSON()
-			, currentArtifact: media.CurrentArtifact?.ToJSON()
-			, history: media.History.map((image)=>image.ToJSON())
+			activeImage: media.ActiveImage?.toJSON()
+			, currentArtifact: media.CurrentArtifact?.toJSON()
+			, history: media.History.map((image)=>image.toJSON())
 			, isGenerating: media.IsGenerating
 			, selectedRatio: draft.SelectedRatio
 			, accumulatedChanges: [...draft.AccumulatedChanges]
 			, generationPrompt: draft.GenerationPrompt
-			, messages: chat.Messages.map((message)=>message.ToJSON())
+			, messages: chat.Messages.map((message)=>message.toJSON())
 			, inputText: chat.InputText
 			, isConsulting: chat.IsConsulting
 		};
