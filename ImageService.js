@@ -31,7 +31,7 @@ var ImageService=Function.extend(Object, function () {
 		let dimensions=await this.GetDimensions(output);
 		let original=image||{};
 		return {
-			...original, kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
+			...original, id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
 			, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
 			, ...dimensions
 			, prompt: `Local runtime edit: ${actionName}`
@@ -82,7 +82,7 @@ var ImageService=Function.extend(Object, function () {
 		return {
 			id: 'cam_'+Date.now()
 			, base64: photo.base64
-			, mimeType: photo.mimeType
+			, mimeType: photo.mimeType||'image/png'
 			, mediaId: upload.mediaId
 			, prompt: '相機即時拍攝'
 			, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})

@@ -3,8 +3,8 @@ var AgentState=Function.extend(Object, function () {
 	AgentState=_[AgentState];
 	function AgentState() {
 		_['base'].apply(this, arguments);
-		this.ActiveImage=null;
-		this.CurrentArtifact=null;
+		this.ActiveMedia=null;
+		this.CurrentMedia=null;
 		this.History=[];
 		this.IsGenerating=false;
 		this.SelectedRatio='original';
@@ -32,31 +32,31 @@ var AgentState=Function.extend(Object, function () {
 		return file;
 	};
 	_['public'].Apply=function (patch) {
-		if ('activeImage' in patch) {
-			this.ActiveImage=patch.activeImage?this.AsMedia(patch.activeImage):null;
-			this.Remember(this.ActiveImage, patch.activeImage);
+		if ('activeMedia' in patch) {
+			this.ActiveMedia=patch.activeMedia?this.AsMedia(patch.activeMedia):null;
+			this.Remember(this.ActiveMedia, patch.activeMedia);
 		}
-		if ('currentArtifact' in patch) {
-			this.CurrentArtifact=this.AsMedia(patch.currentArtifact);
-			this.Remember(this.CurrentArtifact, patch.currentArtifact);
+		if ('currentMedia' in patch) {
+			this.CurrentMedia=this.AsMedia(patch.currentMedia);
+			this.Remember(this.CurrentMedia, patch.currentMedia);
 		}
 		if ('history' in patch) {
-			this.History=patch.history.map((image)=>this.AsMedia(image));
+			this.History=patch.history.map((item)=>this.AsMedia(item));
 			for (let i=0; i<this.History.length; i++) this.Remember(this.History[i], patch.history[i]);
 		}
 		if ('isGenerating' in patch) this.IsGenerating=patch.isGenerating;
 		if ('selectedRatio' in patch) this.SelectedRatio=patch.selectedRatio;
 		if ('accumulatedChanges' in patch) this.AccumulatedChanges=patch.accumulatedChanges.filter((item)=>'string'===typeof item);
 		if ('generationPrompt' in patch) this.GenerationPrompt=patch.generationPrompt;
-		if ('messages' in patch) this.Messages=patch.messages.map((entry)=>entry instanceof Message?entry:new Message({...entry, includedImage: this.AsMedia(entry.includedImage)}));
+		if ('messages' in patch) this.Messages=patch.messages.map((entry)=>entry instanceof Message?entry:new Message({...entry, includedMedia: this.AsMedia(entry.includedMedia)}));
 		if ('inputText' in patch) this.InputText=patch.inputText;
 		if ('isConsulting' in patch) this.IsConsulting=patch.isConsulting;
 	};
 	_['public'].ToSnapshot=function () {
 		let describe=(media)=>media?{...media.toJSON(), data: media.Data, title: this.Labels.get(media.Id), mediaId: this.MediaIds.get(media.Id)}:null;
 		return {
-			activeImage: describe(this.ActiveImage)
-			, currentArtifact: describe(this.CurrentArtifact)
+			activeMedia: describe(this.ActiveMedia)
+			, currentMedia: describe(this.CurrentMedia)
 			, history: this.History.map(describe)
 			, isGenerating: this.IsGenerating
 			, selectedRatio: this.SelectedRatio
@@ -67,8 +67,8 @@ var AgentState=Function.extend(Object, function () {
 			, isConsulting: this.IsConsulting
 		};
 	};
-	_['public'].ActiveImage=null;
-	_['public'].CurrentArtifact=null;
+	_['public'].ActiveMedia=null;
+	_['public'].CurrentMedia=null;
 	_['public'].History=null;
 	_['public'].IsGenerating=null;
 	_['public'].SelectedRatio=null;

@@ -18,10 +18,15 @@ var MessageList=Function.extend(Object, function () {
 			let time=document.createElement('small');
 			time.textContent=('user'===message.Sender?text('you'):'system'===message.Sender?'App':text('agent'))+' · '+message.Timestamp;
 			item.appendChild(time);
-			if (message.IncludedImage) {
-				let preview=document.createElement('img');
-				preview.src=url(message.IncludedImage);
-				preview.alt='Image result';
+			if (message.IncludedMedia) {
+				let preview=document.createElement(message.IncludedMedia instanceof Media.Video?'video':'img');
+				if (message.IncludedMedia instanceof Media.Video) {
+					preview.controls=true;
+					preview.playsInline=true;
+					preview.preload='metadata';
+				}
+				preview.src=url(message.IncludedMedia);
+				if (message.IncludedMedia instanceof Media.Image) preview.alt='Media result';
 				item.appendChild(preview);
 			}
 			let body=document.createElement('div');

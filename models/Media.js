@@ -6,7 +6,6 @@ var Media=Function.extend(Object, function () {
 		_['base'].apply(this, arguments);
 		this.Id=value.id||'media_'+Date.now()+'_'+Math.random().toString(36).slice(2);
 		this.MimeType=value.mimeType||'application/octet-stream';
-		this.Kind=value.kind||'media';
 		if (value.data instanceof Blob) this.Data=value.data;
 		else if (value.base64) {
 			let binary=atob(value.base64);
@@ -18,8 +17,9 @@ var Media=Function.extend(Object, function () {
 	}
 	Media.From=function (value) {
 		if (!value||value instanceof Media) return value;
-		if ('video'===value.kind||/^video\//.test(value.mimeType||'')) return new Media.Video(value);
-		if ('image'===value.kind||/^image\//.test(value.mimeType||'')) return new Media.Image(value);
+		if ('string'!==typeof value.mimeType||!value.mimeType) throw new Error('Media needs a MIME type.');
+		if (/^video\//.test(value.mimeType)) return new Media.Video(value);
+		if (/^image\//.test(value.mimeType)) return new Media.Image(value);
 		return new Media(value);
 	};
 	_['public'].ToBase64=async function () {
@@ -29,8 +29,7 @@ var Media=Function.extend(Object, function () {
 		for (let i=0; i<bytes.length; i+=32768) parts.push(String.fromCharCode(...bytes.subarray(i, i+32768)));
 		return btoa(parts.join(''));
 	};
-	_['public'].toJSON=function () { return {kind: this.Kind, id: this.Id, mimeType: this.MimeType}; };
-	_['public'].Kind=null;
+	_['public'].toJSON=function () { return {id: this.Id, mimeType: this.MimeType}; };
 	_['public'].Id=null;
 	_['public'].MimeType=null;
 	_['public'].Data=null;
@@ -43,11 +42,10 @@ var Media=Function.extend(Object, function () {
 			this.Width=value.width||null;
 			this.Height=value.height||null;
 		}
-		_['public'].Kind='image';
 		_['public'].Width=null;
 		_['public'].Height=null;
 		_['public'].toJSON=function () {
-			return {kind: 'image', id: this.Id, mimeType: this.MimeType, width: this.Width, height: this.Height};
+			return {id: this.Id, mimeType: this.MimeType, width: this.Width, height: this.Height};
 		};
 	});
 
@@ -59,11 +57,10 @@ var Media=Function.extend(Object, function () {
 			this.DurationSeconds=value.durationSeconds||null;
 			this.Resolution=value.resolution||null;
 		}
-		_['public'].Kind='video';
 		_['public'].DurationSeconds=null;
 		_['public'].Resolution=null;
 		_['public'].toJSON=function () {
-			return {kind: 'video', id: this.Id, mimeType: this.MimeType, durationSeconds: this.DurationSeconds, resolution: this.Resolution};
+			return {id: this.Id, mimeType: this.MimeType, durationSeconds: this.DurationSeconds, resolution: this.Resolution};
 		};
 	});
 	Media.Image=Image;

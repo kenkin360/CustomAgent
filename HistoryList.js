@@ -11,21 +11,27 @@ var HistoryList=Function.extend(Object, function () {
 		let $this=_(this);
 		if (!area) { $this.m_lastNode=null; return; }
 		if (state.History!==$this.m_lastHistory||area!==$this.m_lastNode) {
-			area.replaceChildren(...state.History.map((image)=>{
+			area.replaceChildren(...state.History.map((media)=>{
 				let button=document.createElement('button');
-				button.dataset.version=image.Id;
-				button.title=state.Labels.get(image.Id)||'Image';
-				button.onclick=()=>select(image.Id);
-				let thumbnail=document.createElement('img');
-				thumbnail.src=url(image);
-				thumbnail.alt=state.Labels.get(image.Id)||'Image';
+				button.dataset.version=media.Id;
+				button.title=state.Labels.get(media.Id)||'Media';
+				button.onclick=()=>select(media.Id);
+				let thumbnail=document.createElement(media instanceof Media.Video?'video':'img');
+				if (media instanceof Media.Video) {
+					thumbnail.muted=true;
+					thumbnail.playsInline=true;
+					thumbnail.preload='metadata';
+					thumbnail.onloadedmetadata=()=>{ if (thumbnail.duration>0.1) thumbnail.currentTime=0.1; };
+				}
+				thumbnail.src=url(media);
+				if (media instanceof Media.Image) thumbnail.alt=state.Labels.get(media.Id)||'Media';
 				button.appendChild(thumbnail);
 				return button;
 			}));
 			$this.m_lastHistory=state.History;
 			$this.m_lastNode=area;
 		}
-		for (let button of area.children) button.classList.toggle('ca-selected', button.dataset.version===state.ActiveImage?.Id);
+		for (let button of area.children) button.classList.toggle('ca-selected', button.dataset.version===state.ActiveMedia?.Id);
 	};
 	_['private'].m_lastHistory=null;
 	_['private'].m_lastNode=null;

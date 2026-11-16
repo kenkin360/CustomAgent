@@ -20,11 +20,13 @@ var View=Function.extend(Object, function () {
 		return urls.get(media);
 	};
 	_['public'].Dispose=function () {
+		let movie=this.Node('video');
+		if (movie) { movie.pause(); movie.removeAttribute('src'); movie.load(); }
 		for (let url of _(this).m_urls.values()) URL.revokeObjectURL(url);
 		_(this).m_urls.clear();
 	};
 	_['public'].Prune=function (state) {
-		let used=new Set([state.ActiveImage, state.CurrentArtifact, ...state.History, ...state.Messages.map((message)=>message.IncludedImage)]);
+		let used=new Set([state.ActiveMedia, state.CurrentMedia, ...state.History, ...state.Messages.map((message)=>message.IncludedMedia)]);
 		for (let [media, url] of _(this).m_urls) if (!used.has(media)) {
 			URL.revokeObjectURL(url);
 			_(this).m_urls.delete(media);
@@ -59,15 +61,29 @@ var View=Function.extend(Object, function () {
 		let chat=state;
 		let node=(role)=>new HtmlNode(this.Node(role));
 		let picture=node('image');
+		let video=node('video');
 		let image=picture.GetElement();
-		if (media.ActiveImage) {
-			let url=this.Url(media.ActiveImage);
-			if (image&&image.src!==url) picture.SetSource(url);
-			picture.Show(true);
+		let movie=video.GetElement();
+		let showImage=media.ActiveMedia instanceof Media.Image&&!!media.ActiveMedia.Data;
+		let showVideo=media.ActiveMedia instanceof Media.Video&&!!media.ActiveMedia.Data;
+		if (showImage&&image) {
+			let url=this.Url(media.ActiveMedia);
+			if (image.src!==url) picture.SetSource(url);
 		}
-		else picture.Show(false);
-		node('empty').SetStyle('display', media.ActiveImage?'none':'block');
-		node('image-ratio').SetText(media.ActiveImage?.Width&&media.ActiveImage?.Height?`${media.ActiveImage.Width} × ${media.ActiveImage.Height}`:'');
+		else if (image?.getAttribute('src')) image.removeAttribute('src');
+		picture.Show(showImage);
+		if (showVideo&&movie) {
+			let url=this.Url(media.ActiveMedia);
+			if (movie.src!==url) movie.src=url;
+		}
+		else if (movie?.getAttribute('src')) {
+			movie.pause();
+			movie.removeAttribute('src');
+			movie.load();
+		}
+		video.Show(showVideo);
+		node('empty').SetStyle('display', showImage||showVideo?'none':'block');
+		node('image-ratio').SetText(showImage&&media.ActiveMedia.Width&&media.ActiveMedia.Height?`${media.ActiveMedia.Width} × ${media.ActiveMedia.Height}`:showVideo?`${media.ActiveMedia.DurationSeconds||'?'} s`:'');
 		node('generating').SetStyle('display', media.IsGenerating?'flex':'none');
 		this.Localize(text);
 		new HtmlNode(root.querySelector('[data-action="send"]')).SetText(chat.IsConsulting?text('stop'):text('send'));

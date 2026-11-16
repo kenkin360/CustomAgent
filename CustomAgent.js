@@ -37,8 +37,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].Slots=['header', 'canvas', 'chat', 'overlay'];
 	CustomAgent.ActionNames=['readCompiledSource', 'readRemoteSource', 'readInstalledSource', 'inspectRuntime', 'loadModule', 'rollback', 'resetConversation', 'generateVideo'];
 	_['public'].Text=function (key) {
-		let english={tagline: 'Describe an edit to use local tools, or generate an image', help: 'Help', target: 'Target Image', download: 'Download', empty: 'No image selected. Load an image or describe an idea in chat.', media: '＋ Media', camera: 'Camera', generating: 'Generating image…', history: 'Image versions', copyPrompt: 'Copy prompt', generate: 'Generate image from confirmed changes', ratio: 'Output ratio', original: 'Original', input: 'Discuss an idea, draw a rectangle, inspect code, or create a local tool…', send: 'Send', stop: 'Stop', about: "Discuss image changes or ask for local operations. Only the Generate button creates a new image. You can also inspect and extend this session's code.", close: 'Close', confirmedChanges: 'Confirmed changes', you: 'You', agent: 'Assistant', promptDraft: 'Combined prompt draft: ', copy: 'Copy', thinking: 'Thinking and running local operations…'};
-		let chinese={tagline: '描述修改即可執行本地操作，也可選擇生成影像', help: '使用說明', target: '當前聚焦影像 (Target Image)', download: '下載', empty: '尚未選擇或拍攝影像。請載入圖片，或在對話中描述構想。', media: '＋ 媒體庫', camera: '拍照', generating: 'AI 正在修訂影像…', history: '迭代歷程版本', copyPrompt: '複製提示詞', generate: '依已確認改動生成影像', ratio: '輸出比例', original: '原圖', input: '討論構想、畫矩形、查看程式碼，或編寫本地功能…', send: '傳送', stop: '停止', about: '可討論影像修改或要求本地操作。只有按下生成按鈕才會產生新影像，也可以要求查閱及擴充本次執行的程式碼。', close: '關閉', confirmedChanges: '已確認的改動項目', you: '您', agent: 'AI 助理 (Agent)', promptDraft: '整合提示詞草稿：', copy: '複製', thinking: '正在理解要求並處理本地操作…'};
+		let english={tagline: 'Describe an edit to use local tools, or generate an image', help: 'Help', target: 'Target Media', download: 'Download', empty: 'No media selected. Load an image or describe an idea in chat.', media: '＋ Media', camera: 'Camera', generating: 'Generating image…', history: 'Media versions', copyPrompt: 'Copy prompt', generate: 'Generate image from confirmed changes', ratio: 'Output ratio', original: 'Original', input: 'Discuss an idea, draw a rectangle, inspect code, or create a local tool…', send: 'Send', stop: 'Stop', about: "Discuss image changes or ask for local operations. Only the Generate button creates a new image. You can also inspect and extend this session's code.", close: 'Close', confirmedChanges: 'Confirmed changes', you: 'You', agent: 'Assistant', promptDraft: 'Combined prompt draft: ', copy: 'Copy', thinking: 'Thinking and running local operations…'};
+		let chinese={tagline: '描述修改即可執行本地操作，也可選擇生成影像', help: '使用說明', target: '目前媒體 (Target Media)', download: '下載', empty: '尚未選擇媒體。請載入圖片，或在對話中描述構想。', media: '＋ 媒體庫', camera: '拍照', generating: 'AI 正在修訂影像…', history: '媒體版本', copyPrompt: '複製提示詞', generate: '依已確認改動生成影像', ratio: '輸出比例', original: '原圖', input: '討論構想、畫矩形、查看程式碼，或編寫本地功能…', send: '傳送', stop: '停止', about: '可討論影像修改或要求本地操作。只有按下生成按鈕才會產生新影像，也可以要求查閱及擴充本次執行的程式碼。', close: '關閉', confirmedChanges: '已確認的改動項目', you: '您', agent: 'AI 助理 (Agent)', promptDraft: '整合提示詞草稿：', copy: '複製', thinking: '正在理解要求並處理本地操作…'};
 		return ('zh'===_(this).m_view.GetLocale()?chinese:english)[key]||english[key]||key;
 	};
 	_['public'].Localize=function () { _(this).m_view.Localize((key)=>this.Text(key)); };
@@ -55,8 +55,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].GetImageInfo=async function () {
 		let $this=_(this);
-		let image=$this.m_state.ActiveImage;
-		if (!image) return null;
+		let image=$this.m_state.ActiveMedia;
+		if (!(image instanceof Media.Image)) return null;
 		let dimensions=image.Width&&image.Height?{width: image.Width, height: image.Height}:await new ImageService().GetDimensions(await $this.ToLegacyMedia(image));
 		return {...dimensions, mimeType: image.MimeType, title: $this.m_state.Labels.get(image.Id)};
 	};
@@ -105,9 +105,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 	_['public'].SelectVersion=function (id) {
 		let $this=_(this);
-		let image=$this.m_state.History.find((item)=>item.Id===id);
-		if (!image) throw new Error('Image version not found: '+id);
-		$this.SetValues({activeImage: image, currentArtifact: image});
+		let media=$this.m_state.History.find((item)=>item.Id===id);
+		if (!media) throw new Error('Media version not found: '+id);
+		$this.SetValues({activeMedia: media, currentMedia: media});
 	};
 	_['public'].SendMessage=function (text) { return this.Send(text); };
 	_['public'].Stop=function () {
@@ -122,15 +122,16 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		await $this.m_modules.GetStartup();
 		let state=$this.m_state;
-		let image=await $this.ToLegacyMedia(state.ActiveImage);
-		let artifact=state.CurrentArtifact===state.ActiveImage?image:await $this.ToLegacyMedia(state.CurrentArtifact);
+		let image=state.ActiveMedia instanceof Media.Image?await $this.ToLegacyMedia(state.ActiveMedia):null;
+		let artifact=state.CurrentMedia===state.ActiveMedia&&image?image:await $this.ToLegacyMedia(state.CurrentMedia);
 		let result=await $this.ExecuteAction(action, {image, artifact, track, source, Type});
 		if (result.artifact) {
-			let artifact=result.artifact;
-			$this.SetValues({
-				currentArtifact: artifact
-				, ...('image'===artifact.kind?{activeImage: artifact, history: [artifact, ...$this.m_state.History]}:{})
-			});
+			let media=state.AsMedia(result.artifact);
+			if (media instanceof Media.Image||media instanceof Media.Video) {
+				$this.SetValues({activeMedia: result.artifact, currentMedia: result.artifact, history: [result.artifact, ...state.History]});
+			}
+			else $this.SetValues({currentMedia: result.artifact});
+			result.artifact=media;
 		}
 		return result;
 	};
@@ -190,18 +191,25 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['private'].ExecuteAction=async function (action, context) {
 		if (!action?.arguments||'object'!==typeof action.arguments||Array.isArray(action.arguments)) throw new Error('Action arguments must be an object.');
-		let args=action.arguments;
 		let callback=_(this).ResolveAction(action.name);
 		if ('function'!==typeof callback) throw new Error('Runtime function not found: '+String(action.name));
-		let value=await callback(args, context);
+		let value=await callback(action.arguments, context);
 		if (undefined!==value?.artifact) {
-			if (!value.artifact||'object'!==typeof value.artifact||'string'!==typeof value.artifact.kind||!value.artifact.kind) throw new Error('An action artifact needs a kind.');
-			if ('image'===value.artifact.kind) {
-				let image=await new ImageService().ReadActionResult({image: value.artifact}, context.image, action.name);
-				if (!image) throw new Error('An image artifact needs supported image content.');
+			let artifact=value.artifact;
+			if (!artifact||'object'!==typeof artifact) throw new Error('An action media result needs file content and a MIME type.');
+			if (!(artifact instanceof Media)&&!artifact.data&&!artifact.base64&&artifact.mediaId) {
+				let content=await Flow.media.getBase64({mediaId: artifact.mediaId});
+				artifact={...artifact, ...content, mediaId: artifact.mediaId};
+			}
+			if (!(artifact instanceof Media)&&(!artifact.mimeType||!artifact.base64&&!(artifact.data instanceof Blob))) {
+				throw new Error('An action media result needs file content and a MIME type.');
+			}
+			if (!(artifact instanceof Media)&&/^image\//.test(artifact.mimeType)&&artifact.base64) {
+				let image=await new ImageService().ReadActionResult({image: artifact}, context.image, action.name);
+				if (!image) throw new Error('An image result needs supported image content.');
 				return {message: 'string'===typeof value.message?value.message:`${action.name} updated the current image.`, artifact: image, image};
 			}
-			return {message: 'string'===typeof value.message?value.message:`${action.name} completed.`, artifact: value.artifact};
+			return {message: 'string'===typeof value.message?value.message:`${action.name} completed.`, artifact};
 		}
 		let image=await new ImageService().ReadActionResult(value, context.image, action.name);
 		if (image) return {message: 'string'===typeof value.message?value.message:`${action.name} updated the current image.`, artifact: image, image};
@@ -270,7 +278,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		try {
 			let image=await new ImageService().Select();
 			if (!image) return;
-			$this.SetValues({activeImage: image, currentArtifact: image, history: [image, ...$this.m_state.History]});
+			$this.SetValues({activeMedia: image, currentMedia: image, history: [image, ...$this.m_state.History]});
 			await this.NotifyAssistant('Media selected', {Title: image.title, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -281,7 +289,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		try {
 			let image=await new ImageService().Capture();
 			if (!image) return;
-			$this.SetValues({activeImage: image, currentArtifact: image, history: [image, ...$this.m_state.History]});
+			$this.SetValues({activeMedia: image, currentMedia: image, history: [image, ...$this.m_state.History]});
 			await this.NotifyAssistant('Camera image captured', {Title: image.title, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -294,9 +302,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (!text||state.IsGenerating) return;
 		$this.SetValues({isGenerating: true});
 		try {
-			let generated=await new ImageService().Generate(text, state.ActiveImage?await $this.ToLegacyMedia(state.ActiveImage):null, state.SelectedRatio, state.History.length+1);
+			let generated=await new ImageService().Generate(text, state.ActiveMedia instanceof Media.Image?await $this.ToLegacyMedia(state.ActiveMedia):null, state.SelectedRatio, state.History.length+1);
 			let image=generated.Image;
-			$this.SetValues({activeImage: image, currentArtifact: image, history: [image, ...state.History]});
+			$this.SetValues({activeMedia: image, currentMedia: image, history: [image, ...state.History]});
 			await this.NotifyAssistant('Image generation completed', {Title: image.title, Prompt: text, Width: image.width, Height: image.height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -305,7 +313,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].Download=async function () {
 		let $this=_(this);
-		try { await new ImageService().Download(await $this.ToLegacyMedia($this.m_state.ActiveImage)); }
+		try {
+			let media=$this.m_state.ActiveMedia;
+			if (media instanceof Media.Video) await new VideoService().Download(await $this.ToLegacyMedia(media));
+			else if (media instanceof Media.Image) await new ImageService().Download(await $this.ToLegacyMedia(media));
+		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
 
@@ -419,16 +431,24 @@ ${runtime.message}
 readCompiledSource 空參數列出啟動時已完整拆解的固定 host 檔案，{file} 取得完整原碼；readRemoteSource 空參數列出 Bundle.Config 等遠端來源，{name} 可重新取得其內容；readInstalledSource 空參數列出已安裝模組，{name} 取得安裝時保留的完整原碼，遠端安裝者可重新取得。inspectRuntime 檢查現有函數、模組及原碼入口。
 loadModule 接收獨立的 JavaScript 程式碼或遠端腳本 URL。需要載入時，先輸出 javascript 程式碼區塊（原碼）或 text 程式碼區塊（URL），再於答覆最後輸出操作控制 JSON，其 localAction 為 {"name":"loadModule","arguments":{"name":"模組名稱"}}，並在 attemptPlan 列出 loadModule。自行撰寫類型時，以頂層 var 和 Function.extend(Base, factory) 宣告，將建構子、方法及靜態成員寫在類別定義內；需要完整範例時，可透過 readInstalledSource 查看 DrawRectangle 原碼。可呼叫的模組提供靜態 Run。
 直接以模組名稱作為操作名稱呼叫其 Run；rollback 撤銷上一項模組安裝；resetConversation 清空對話。需要實作新功能時可讀程式碼並撰寫、載入模組。
-generateVideo 可由使用者提出影片生成要求時執行，參數為 {prompt,aspectRatio,durationSeconds,resolution}；aspectRatio 為 16:9 或 9:16，durationSeconds 為 3 至 15，resolution 為 720p 或 360p。可選 useCurrentImageAsFirstFrame: true 作為首幀，或 useCurrentImageAsReference: true 作為參考；也可傳 firstFrameImageMediaId、referenceImageMediaIds，或 sourceVideoMediaId 作為影片編輯來源。首幀不得與參考圖或來源影片同時使用。完成後影片自動存入 Flow Assets，目前沒有影片播放 UI。
-可用模組可使用瀏覽器標準 API，Run 收到參數與 {artifact,image,track,source,Type}；有產物時回傳 {message,artifact:{kind,...}}，其中 artifact.kind 指出產物類型，影片可保留 mediaId、mimeType 與時長。既有影像模組仍可回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。
+generateVideo 可由使用者提出影片生成要求時執行，參數為 {prompt,aspectRatio,durationSeconds,resolution}；aspectRatio 為 16:9 或 9:16，durationSeconds 為 3 至 15，resolution 為 720p 或 360p。可選 useCurrentImageAsFirstFrame: true 作為首幀，或 useCurrentImageAsReference: true 作為參考；也可傳 firstFrameImageMediaId、referenceImageMediaIds，或 sourceVideoMediaId 作為影片編輯來源。首幀不得與參考圖或來源影片同時使用。完成後影片自動存入 Flow Assets，並顯示在媒體區。
+可用模組可使用瀏覽器標準 API，Run 收到參數與 {artifact,image,track,source,Type}；有產物時回傳 {message,artifact:{mimeType,base64,...}} 或直接回傳具體的 Media.Image、Media.Video，種類以類型判斷；影片可保留 mediaId 與時長，檔案 MIME 類型必須明確。既有影像模組仍可回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。
 若有待使用者確認的生成修改，可於 JSON 加入 accumulatedChanges、suggestedPrompt、aspectRatio。操作結果與錯誤由 App 回傳；答覆使用者時以自然語言說明結果。
 `;
 	};
 
-	_['private'].DescribeArtifact=function (artifact) {
-		if (!artifact) return null;
-		let {kind, id, title, mimeType, mediaId, width, height, durationSeconds}=artifact;
-		return {kind, id, title, mimeType, mediaId, width, height, durationSeconds};
+	_['private'].DescribeMedia=function (media) {
+		if (!media) return null;
+		let state=this.m_state;
+		return {
+			type: media instanceof Media.Image?'image':media instanceof Media.Video?'video':'media'
+			, id: media.Id
+			, title: state.Labels.get(media.Id)
+			, mimeType: media.MimeType
+			, mediaId: state.MediaIds.get(media.Id)
+			, ...(media instanceof Media.Image?{width: media.Width, height: media.Height}:{})
+			, ...(media instanceof Media.Video?{durationSeconds: media.DurationSeconds, resolution: media.Resolution}:{})
+		};
 	};
 
 	_['private'].HandleMessage=async function (message, turn) {
@@ -449,10 +469,10 @@ generateVideo 可由使用者提出影片生成要求時執行，參數為 {prom
 			?initial.accumulatedChanges.map((entry, index)=>`${index+1}. ${entry}`).join('\n')
 			:'(none)';
 
-		let artifact=initial.currentArtifact;
+		let artifact=$this.m_state.CurrentMedia;
 		let question=()=>`
 Current image: ${imageInfo?`${imageInfo.width} × ${imageInfo.height} pixels (${imageInfo.mimeType})`:'none'}
-Current artifact: ${JSON.stringify($this.DescribeArtifact(artifact))}
+Current artifact: ${JSON.stringify($this.DescribeMedia(artifact))}
 Selected generation aspect ratio: ${initial.selectedRatio}
 Pending generation changes:
 ${changes}
@@ -462,7 +482,7 @@ Current user message:
 ${message}
 `;
 
-		let image=!artifact||'image'===artifact.kind?await $this.ToLegacyMedia($this.m_state.ActiveImage):null;
+		let image=$this.m_state.ActiveMedia instanceof Media.Image?await $this.ToLegacyMedia($this.m_state.ActiveMedia):null;
 		let changesOut=initial.accumulatedChanges;
 		let promptOut=initial.generationPrompt;
 		let ratioOut=initial.selectedRatio;
@@ -536,12 +556,9 @@ App 已清空對話。以使用者這次要求的語言自然回覆。
 
 				if (result.artifact) {
 					artifact=result.artifact;
-					image='image'===artifact.kind?artifact:null;
-					if (image) {
-						imageInfo={width: image.width, height: image.height, mimeType: image.mimeType};
-						edited=image;
-					}
-					else edited=null;
+					image=artifact instanceof Media.Image?await $this.ToLegacyMedia(artifact):null;
+					imageInfo=artifact instanceof Media.Image?{width: artifact.Width, height: artifact.Height, mimeType: artifact.MimeType}:null;
+					edited=artifact instanceof Media.Image||artifact instanceof Media.Video?artifact:null;
 				}
 
 				if ('loadModule'===action.name) {
@@ -553,7 +570,7 @@ App 已清空對話。以使用者這次要求的語言自然回覆。
 					action: action.name
 					, status: 'success'
 					, result: result.message
-					, ...(result.artifact?{artifact: $this.DescribeArtifact(result.artifact)}:{})
+					, ...(result.artifact?{artifact: $this.DescribeMedia(result.artifact)}:{})
 				});
 				runtime=await app.InspectRuntime({});
 			}
@@ -595,10 +612,7 @@ Summarize these results and answer the user in natural language.
 			accumulatedChanges: changesOut
 			, suggestedPrompt: promptOut||undefined
 			, aspectRatio: ratioOut
-			, ...('video'===artifact?.kind?{includedArtifact: $this.DescribeArtifact(artifact)}:{})
-			, ...(edited?{
-				includedImage: edited
-			}:{})
+			, includedMedia: edited||(artifact instanceof Media.Video?artifact:undefined)
 		});
 	};
 
@@ -621,7 +635,7 @@ Reply briefly to the user in the language of the current conversation.
 `});
 
 		if (!response.text?.trim()) throw new Error('The model returned an empty answer.');
-		this.Reply(response.text.trim(), image?{includedImage: image}:{});
+		this.Reply(response.text.trim(), image?{includedMedia: image}:{});
 	};
 
 	_['private'].m_state=null;
