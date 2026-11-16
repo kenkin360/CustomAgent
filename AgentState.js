@@ -16,18 +16,18 @@ var AgentState=Function.extend(Object, function () {
 		let media=this.Media;
 		let draft=this.Draft;
 		let chat=this.Chat;
-		return {
-			activeImage: media.ActiveImage?.toJSON()
-			, currentArtifact: media.CurrentArtifact?.toJSON()
-			, history: media.History.map((image)=>image.toJSON())
+		return JSON.parse(JSON.stringify({
+			activeImage: media.ActiveImage
+			, currentArtifact: media.CurrentArtifact
+			, history: media.History
 			, isGenerating: media.IsGenerating
 			, selectedRatio: draft.SelectedRatio
 			, accumulatedChanges: [...draft.AccumulatedChanges]
 			, generationPrompt: draft.GenerationPrompt
-			, messages: chat.Messages.map((message)=>message.toJSON())
+			, messages: chat.Messages
 			, inputText: chat.InputText
 			, isConsulting: chat.IsConsulting
-		};
+		}));
 	};
 	_['public'].Media=null;
 	_['public'].Draft=null;

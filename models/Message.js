@@ -11,7 +11,7 @@ var Message=Function.extend(Object, function () {
 	}
 	_['public'].toJSON=function () {
 		let content=this.Content;
-		return {id: this.Id, sender: this.Sender, text: this.Text, timestamp: this.Timestamp, includedImage: content.IncludedImage?.toJSON(), includedArtifact: content.IncludedArtifact?.toJSON(), suggestedPrompt: content.SuggestedPrompt, aspectRatio: content.AspectRatio, accumulatedChanges: content.AccumulatedChanges};
+		return {id: this.Id, sender: this.Sender, text: this.Text, timestamp: this.Timestamp, includedImage: content.IncludedImage, includedArtifact: content.IncludedArtifact, suggestedPrompt: content.SuggestedPrompt, aspectRatio: content.AspectRatio, accumulatedChanges: content.AccumulatedChanges};
 	};
 	_['public'].Id=null;
 	_['public'].Sender=null;

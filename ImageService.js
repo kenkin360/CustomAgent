@@ -29,14 +29,15 @@ var ImageService=Function.extend(Object, function () {
 		let output=value&&'object'===typeof value&&'image' in value?value.image:value;
 		if (!output||'string'!==typeof output.base64||!/^image\/(png|jpeg|webp)$/.test(output.mimeType)) return null;
 		let dimensions=await this.GetDimensions(output);
+		let original=image?JSON.parse(JSON.stringify(image)):{};
 		return {
-			...(image?.toJSON?image.toJSON():image), kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
+			...original, kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
 			, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
 			, ...dimensions
 			, prompt: `Local runtime edit: ${actionName}`
 			, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
 			, aspectRatio: this.GetAspectRatio(dimensions)
-			, title: output.title||`${image?.title||'Image'} · ${actionName}`
+			, title: output.title||`${original.title||'Image'} · ${actionName}`
 		};
 	};
 
