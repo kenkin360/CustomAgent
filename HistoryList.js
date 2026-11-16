@@ -10,22 +10,22 @@ var HistoryList=Function.extend(Object, function () {
 	_['public'].Update=function (area, state, select) {
 		let $this=_(this);
 		if (!area) { $this.m_lastNode=null; return; }
-		if (state.history!==$this.m_lastHistory||area!==$this.m_lastNode) {
-			area.replaceChildren(...state.history.map((image)=>{
+		if (state.History!==$this.m_lastHistory||area!==$this.m_lastNode) {
+			area.replaceChildren(...state.History.map((image)=>{
 				let button=document.createElement('button');
-				button.dataset.version=image.id;
-				button.title=image.title;
-				button.onclick=()=>select(image.id);
+				button.dataset.version=image.Id;
+				button.title=image.Provenance.Title;
+				button.onclick=()=>select(image.Id);
 				let thumbnail=document.createElement('img');
-				thumbnail.src=`data:${image.mimeType};base64,${image.base64}`;
-				thumbnail.alt=image.title;
+				thumbnail.src=`data:${image.Content.MimeType};base64,${image.Content.Base64}`;
+				thumbnail.alt=image.Provenance.Title;
 				button.appendChild(thumbnail);
 				return button;
 			}));
-			$this.m_lastHistory=state.history;
+			$this.m_lastHistory=state.History;
 			$this.m_lastNode=area;
 		}
-		for (let button of area.children) button.classList.toggle('ca-selected', button.dataset.version===state.activeImage?.id);
+		for (let button of area.children) button.classList.toggle('ca-selected', button.dataset.version===state.ActiveImage?.Id);
 	};
 	_['private'].m_lastHistory=null;
 	_['private'].m_lastNode=null;

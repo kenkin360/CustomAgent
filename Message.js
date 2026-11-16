@@ -3,26 +3,20 @@ var Message=Function.extend(Object, function () {
 	Message=_[Message];
 	function Message(value={}) {
 		_['base'].apply(this, arguments);
-		let $this=_(this);
-		$this.m_id=value.id;
-		$this.m_sender=value.sender;
-		$this.m_text=value.text;
-		$this.m_timestamp=value.timestamp;
-		$this.m_content=new MessageContent(value);
+		this.Id=value.id;
+		this.Sender=value.sender;
+		this.Text=value.text;
+		this.Timestamp=value.timestamp;
+		this.Content=new MessageContent(value);
 	}
-	for (let [name, field] of [['id', 'm_id'], ['sender', 'm_sender'], ['text', 'm_text'], ['timestamp', 'm_timestamp']]) {
-		Object.defineProperty(_['public'], name, {get() { return _(this)[field]; }});
-	}
-	for (let name of ['includedImage', 'includedArtifact', 'suggestedPrompt', 'aspectRatio', 'accumulatedChanges']) {
-		Object.defineProperty(_['public'], name, {get() { return _(this).m_content[name]; }});
-	}
-	_['public'].toJSON=function () {
-		let {id, sender, text, timestamp, includedImage, includedArtifact, suggestedPrompt, aspectRatio, accumulatedChanges}=this;
-		return {id, sender, text, timestamp, includedImage, includedArtifact, suggestedPrompt, aspectRatio, accumulatedChanges};
+	_['public'].ToJSON=function () {
+		let content=this.Content;
+		return {id: this.Id, sender: this.Sender, text: this.Text, timestamp: this.Timestamp, includedImage: content.IncludedImage?.ToJSON(), includedArtifact: content.IncludedArtifact?.ToJSON(), suggestedPrompt: content.SuggestedPrompt, aspectRatio: content.AspectRatio, accumulatedChanges: content.AccumulatedChanges};
 	};
-	_['private'].m_id=null;
-	_['private'].m_sender=null;
-	_['private'].m_text=null;
-	_['private'].m_timestamp=null;
-	_['private'].m_content=null;
+	_['public'].toJSON=function () { return this.ToJSON(); };
+	_['public'].Id=null;
+	_['public'].Sender=null;
+	_['public'].Text=null;
+	_['public'].Timestamp=null;
+	_['public'].Content=null;
 });

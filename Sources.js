@@ -37,13 +37,13 @@ var Sources=Function.extend(Object, function () {
 	_['public'].ReadCompiledSource=function (args={}) {
 		let $this=_(this);
 		if ($this.m_error) throw $this.m_error;
-		if (typeof args.file!=='string') return {message: `Compiled source files: ${JSON.stringify(this.CompiledNames())}`};
+		if ('string'!==typeof args.file) return {message: `Compiled source files: ${JSON.stringify(this.CompiledNames())}`};
 		if (!$this.m_compiled.has(args.file)) throw new Error('Compiled source file not found: '+args.file);
 		return {message: `${args.file}:\n${$this.m_compiled.get(args.file)}`};
 	};
 	_['public'].ReadRemoteSource=async function (args={}) {
 		let entries=_(this).m_entries;
-		if (typeof args.name!=='string') return {message: `Remote source entries: ${JSON.stringify(entries.map((entry)=>({name: entry.Name, url: entry.Value, readyMember: entry.ReadyMember})))}`};
+		if ('string'!==typeof args.name) return {message: `Remote source entries: ${JSON.stringify(entries.map((entry)=>({name: entry.Name, url: entry.Value, readyMember: entry.ReadyMember})))}`};
 		let entry=entries.find((item)=>item.Name===args.name||item.Value.split(/[?#]/)[0].split('/').pop()===args.name);
 		if (!entry) throw new Error('Remote source not found: '+args.name);
 		let response=await fetch(entry.Value);
@@ -52,7 +52,7 @@ var Sources=Function.extend(Object, function () {
 	};
 	_['public'].ReadInstalledSource=async function (args={}) {
 		let sources=_(this).m_installed;
-		if (typeof args.name!=='string') return {message: `Installed modules: ${JSON.stringify(this.InstalledNames())}`};
+		if ('string'!==typeof args.name) return {message: `Installed modules: ${JSON.stringify(this.InstalledNames())}`};
 		let entry=sources.get(args.name);
 		if (!entry) throw new Error('Installed module not found: '+args.name);
 		if (!entry.Remote) return {message: `${args.name}:\n${entry.Value}`};

@@ -3,20 +3,19 @@ var MediaState=Function.extend(Object, function () {
 	MediaState=_[MediaState];
 	function MediaState() {
 		_['base'].apply(this, arguments);
-		let $this=_(this);
-		$this.m_activeImage=null;
-		$this.m_currentArtifact=null;
-		$this.m_history=[];
-		$this.m_isGenerating=false;
+		this.ActiveImage=null;
+		this.CurrentArtifact=null;
+		this.History=[];
+		this.IsGenerating=false;
 	}
-	for (let [name, field, convert] of [
-		['activeImage', 'm_activeImage', (value)=>value?value instanceof ImageArtifact?value:new ImageArtifact(value):null]
-		, ['currentArtifact', 'm_currentArtifact', Artifact.From]
-		, ['history', 'm_history', (value)=>value.map((image)=>image instanceof ImageArtifact?image:new ImageArtifact(image))]
-		, ['isGenerating', 'm_isGenerating', (value)=>value]
-	]) Object.defineProperty(_['public'], name, {get() { return _(this)[field]; }, set(value) { _(this)[field]=convert(value); }});
-	_['private'].m_activeImage=null;
-	_['private'].m_currentArtifact=null;
-	_['private'].m_history=null;
-	_['private'].m_isGenerating=null;
+	_['public'].Apply=function (patch) {
+		if ('activeImage' in patch) this.ActiveImage=patch.activeImage?patch.activeImage instanceof ImageArtifact?patch.activeImage:new ImageArtifact(patch.activeImage):null;
+		if ('currentArtifact' in patch) this.CurrentArtifact=Artifact.From(patch.currentArtifact);
+		if ('history' in patch) this.History=patch.history.map((image)=>image instanceof ImageArtifact?image:new ImageArtifact(image));
+		if ('isGenerating' in patch) this.IsGenerating=patch.isGenerating;
+	};
+	_['public'].ActiveImage=null;
+	_['public'].CurrentArtifact=null;
+	_['public'].History=null;
+	_['public'].IsGenerating=null;
 });

@@ -6,4 +6,6 @@ var Mount=Function.extend(Object, function () {
 		this.Element=element;
 		this.Slot=slot;
 	}
+	_['public'].Element=null;
+	_['public'].Slot=null;
 });

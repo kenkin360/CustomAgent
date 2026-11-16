@@ -61,7 +61,7 @@ var Bundle=Function.extend(Function, function () {
 		, ['MessageList', Bundle.CustomAgent('MessageList.js')]
 		, ['HistoryList', Bundle.CustomAgent('HistoryList.js')]
 		, ['Modules', Bundle.CustomAgent('Modules.js')]
-		, ['Descriptor', Bundle.CustomAgent('Descriptor.js')]
+		, ['Binding', Bundle.CustomAgent('Binding.js')]
 		, ['Installation', Bundle.CustomAgent('Installation.js')]
 		, ['DynamicModule', Bundle.CustomAgent('DynamicModule.js')]
 		, ['Sources', Bundle.CustomAgent('Sources.js')]

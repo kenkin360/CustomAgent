@@ -3,31 +3,23 @@ var Artifact=Function.extend(Object, function () {
 	Artifact=_[Artifact];
 	function Artifact(value={}) {
 		_['base'].apply(this, arguments);
-		let $this=_(this);
-		$this.m_kind=value.kind;
-		$this.m_id=value.id;
-		$this.m_content=new MediaContent(value);
-		$this.m_provenance=new Provenance(value);
+		this.Kind=value.kind;
+		this.Id=value.id;
+		this.Content=new MediaContent(value);
+		this.Provenance=new Provenance(value);
 	}
 	Artifact.From=function (value) {
 		if (!value||value instanceof Artifact) return value;
-		if (value.kind==='image') return new ImageArtifact(value);
-		if (value.kind==='video') return new VideoArtifact(value);
+		if ('image'===value.kind) return new ImageArtifact(value);
+		if ('video'===value.kind) return new VideoArtifact(value);
 		return new Artifact(value);
 	};
-	for (let [name, field] of [['kind', 'm_kind'], ['id', 'm_id']]) {
-		Object.defineProperty(_['public'], name, {get() { return _(this)[field]; }});
-	}
-	for (let [name, owner, field] of [['base64', 'm_content', 'base64'], ['mimeType', 'm_content', 'mimeType'], ['mediaId', 'm_content', 'mediaId'], ['title', 'm_provenance', 'title'], ['prompt', 'm_provenance', 'prompt'], ['timestamp', 'm_provenance', 'timestamp']]) {
-		Object.defineProperty(_['public'], name, {get() { return _(this)[owner][field]; }});
-	}
 	_['public'].ToJSON=function () {
-		let {kind, id, base64, mimeType, mediaId, title, prompt, timestamp}=this;
-		return {kind, id, base64, mimeType, mediaId, title, prompt, timestamp};
+		return {kind: this.Kind, id: this.Id, base64: this.Content.Base64, mimeType: this.Content.MimeType, mediaId: this.Content.MediaId, title: this.Provenance.Title, prompt: this.Provenance.Prompt, timestamp: this.Provenance.Timestamp};
 	};
 	_['public'].toJSON=function () { return this.ToJSON(); };
-	_['private'].m_kind=null;
-	_['private'].m_id=null;
-	_['private'].m_content=null;
-	_['private'].m_provenance=null;
+	_['public'].Kind=null;
+	_['public'].Id=null;
+	_['public'].Content=null;
+	_['public'].Provenance=null;
 });

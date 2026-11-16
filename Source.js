@@ -8,4 +8,8 @@ var Source=Function.extend(Object, function () {
 		this.ReadyMember=readyMember;
 		this.Remote=remote;
 	}
+	_['public'].Name=null;
+	_['public'].Value=null;
+	_['public'].ReadyMember=null;
+	_['public'].Remote=null;
 });

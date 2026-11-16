@@ -11,35 +11,35 @@ var MessageList=Function.extend(Object, function () {
 	_['public'].Update=function (list, state, text) {
 		let $this=_(this);
 		if (!list) { $this.m_lastNode=null; return; }
-		if (state.messages===$this.m_lastMessages&&state.isConsulting===$this.m_lastConsulting&&list===$this.m_lastNode) return;
-		let items=state.messages.map((message)=>{
+		if (state.Messages===$this.m_lastMessages&&state.IsConsulting===$this.m_lastConsulting&&list===$this.m_lastNode) return;
+		let items=state.Messages.map((message)=>{
 			let item=document.createElement('div');
-			item.className=`ca-message ca-${message.sender}`;
+			item.className=`ca-message ca-${message.Sender}`;
 			let time=document.createElement('small');
-			time.textContent=(message.sender==='user'?text('you'):message.sender==='system'?'App':text('agent'))+' · '+message.timestamp;
+			time.textContent=('user'===message.Sender?text('you'):'system'===message.Sender?'App':text('agent'))+' · '+message.Timestamp;
 			item.appendChild(time);
-			if (message.includedImage) {
+			if (message.Content.IncludedImage) {
 				let preview=document.createElement('img');
-				preview.src=`data:${message.includedImage.mimeType};base64,${message.includedImage.base64}`;
+				preview.src=`data:${message.Content.IncludedImage.Content.MimeType};base64,${message.Content.IncludedImage.Content.Base64}`;
 				preview.alt='Image result';
 				item.appendChild(preview);
 			}
 			let body=document.createElement('div');
-			body.textContent=message.text;
+			body.textContent=message.Text;
 			item.appendChild(body);
-			if (message.suggestedPrompt) {
+			if (message.Content.SuggestedPrompt) {
 				let prompt=document.createElement('div');
 				prompt.className='ca-prompt';
-				prompt.textContent=text('promptDraft')+message.suggestedPrompt;
+				prompt.textContent=text('promptDraft')+message.Content.SuggestedPrompt;
 				item.appendChild(prompt);
 				let copy=document.createElement('button');
 				copy.textContent=text('copy');
-				copy.onclick=()=>navigator.clipboard.writeText(message.suggestedPrompt);
+				copy.onclick=()=>navigator.clipboard.writeText(message.Content.SuggestedPrompt);
 				item.appendChild(copy);
 			}
 			return item;
 		});
-		let pendingIndex=state.isConsulting?state.messages.findLastIndex((message)=>message.sender==='user'):-1;
+		let pendingIndex=state.IsConsulting?state.Messages.findLastIndex((message)=>'user'===message.Sender):-1;
 		if (pendingIndex>=0) {
 			let thinking=document.createElement('div');
 			thinking.className='ca-thinking';
@@ -49,9 +49,9 @@ var MessageList=Function.extend(Object, function () {
 			items.splice(pendingIndex+1, 0, thinking);
 		}
 		list.replaceChildren(...items);
-		$this.m_lastMessages=state.messages;
+		$this.m_lastMessages=state.Messages;
 		$this.m_lastNode=list;
-		$this.m_lastConsulting=state.isConsulting;
+		$this.m_lastConsulting=state.IsConsulting;
 		(list.querySelector('.ca-thinking')||list.lastElementChild)?.scrollIntoView({block: 'nearest'});
 	};
 	_['private'].m_lastMessages=null;

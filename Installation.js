@@ -8,4 +8,8 @@ var Installation=Function.extend(Object, function () {
 		this.PreviousModule=previousModule;
 		this.PreviousSource=previousSource;
 	}
+	_['public'].Name=null;
+	_['public'].PreviousGlobal=null;
+	_['public'].PreviousModule=null;
+	_['public'].PreviousSource=null;
 });

@@ -26,8 +26,8 @@ var ImageService=Function.extend(Object, function () {
 	};
 
 	_['public'].ReadActionResult=async function (value, image, actionName) {
-		let output=value&&typeof value==='object'&&'image' in value?value.image:value;
-		if (!output||typeof output.base64!=='string'||!/^image\/(png|jpeg|webp)$/.test(output.mimeType)) return null;
+		let output=value&&'object'===typeof value&&'image' in value?value.image:value;
+		if (!output||'string'!==typeof output.base64||!/^image\/(png|jpeg|webp)$/.test(output.mimeType)) return null;
 		let dimensions=await this.GetDimensions(output);
 		return {
 			...(image?.ToJSON?image.ToJSON():image), kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
@@ -41,10 +41,10 @@ var ImageService=Function.extend(Object, function () {
 	};
 
 	_['private'].GetContent=async function (media) {
-		if (typeof media?.base64==='string'&&media.base64&&typeof media.mimeType==='string'&&media.mimeType) return media;
+		if ('string'===typeof media?.base64&&media.base64&&'string'===typeof media.mimeType&&media.mimeType) return media;
 		if (!media?.mediaId) throw new Error('The image has neither content nor a mediaId.');
 		let content=await Flow.media.getBase64({mediaId: media.mediaId});
-		if (typeof content?.base64!=='string'||!content.base64) throw new Error('Flow did not return the selected image content.');
+		if ('string'!==typeof content?.base64||!content.base64) throw new Error('Flow did not return the selected image content.');
 		let mimeType=content.mimeType||media.mimeType;
 		if (!mimeType) throw new Error('Flow did not return the selected image MIME type.');
 		return {...media, ...content, mimeType};
@@ -94,7 +94,7 @@ var ImageService=Function.extend(Object, function () {
 	_['public'].Generate=async function (prompt, image, ratio, index) {
 		let flow=Flow;
 		let mediaId=image?.mediaId;
-		let aspectRatio=ratio==='original'?(image?this.GetAspectRatio(await this.GetDimensions(image)):undefined):ratio;
+		let aspectRatio='original'===ratio?(image?this.GetAspectRatio(await this.GetDimensions(image)):undefined):ratio;
 		if (image&&!mediaId) {
 			let upload=await flow.upload({base64: image.base64, mimeType: image.mimeType, name: image.title});
 			mediaId=upload.mediaId;

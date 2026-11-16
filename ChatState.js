@@ -3,15 +3,16 @@ var ChatState=Function.extend(Object, function () {
 	ChatState=_[ChatState];
 	function ChatState() {
 		_['base'].apply(this, arguments);
-		let $this=_(this);
-		$this.m_messages=[];
-		$this.m_inputText='';
-		$this.m_isConsulting=false;
+		this.Messages=[];
+		this.InputText='';
+		this.IsConsulting=false;
 	}
-	for (let [name, field, convert] of [['messages', 'm_messages', (value)=>value.map((entry)=>entry instanceof Message?entry:new Message(entry))], ['inputText', 'm_inputText', (value)=>value], ['isConsulting', 'm_isConsulting', (value)=>value]]) {
-		Object.defineProperty(_['public'], name, {get() { return _(this)[field]; }, set(value) { _(this)[field]=convert(value); }});
-	}
-	_['private'].m_messages=null;
-	_['private'].m_inputText=null;
-	_['private'].m_isConsulting=null;
+	_['public'].Apply=function (patch) {
+		if ('messages' in patch) this.Messages=patch.messages.map((entry)=>entry instanceof Message?entry:new Message(entry));
+		if ('inputText' in patch) this.InputText=patch.inputText;
+		if ('isConsulting' in patch) this.IsConsulting=patch.isConsulting;
+	};
+	_['public'].Messages=null;
+	_['public'].InputText=null;
+	_['public'].IsConsulting=null;
 });

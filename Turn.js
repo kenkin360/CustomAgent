@@ -3,8 +3,7 @@ var Turn=Function.extend(Object, function () {
 	Turn=_[Turn];
 	function Turn() {
 		_['base'].apply(this, arguments);
-		_(this).m_cancelled=false;
+		this.Cancelled=false;
 	}
-	Object.defineProperty(_['public'], 'cancelled', {get() { return _(this).m_cancelled; }, set(value) { _(this).m_cancelled=!!value; }});
-	_['private'].m_cancelled=false;
+	_['public'].Cancelled=null;
 });

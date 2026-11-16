@@ -6,9 +6,10 @@ var ImageArtifact=Function.extend(Artifact, function () {
 		_['base'].call(this, {...data, kind: 'image'});
 		_(this).m_dimensions=new Dimensions(data);
 	}
-	for (let name of ['width', 'height', 'aspectRatio']) {
-		Object.defineProperty(_['public'], name, {get() { return _(this).m_dimensions[name]; }});
-	}
-	_['public'].ToJSON=function () { return {...Artifact.prototype.ToJSON.call(this), width: this.width, height: this.height, aspectRatio: this.aspectRatio}; };
+	_['public'].GetDimensions=function () { return _(this).m_dimensions; };
+	_['public'].ToJSON=function () {
+		let dimensions=this.GetDimensions();
+		return {...Artifact.prototype.ToJSON.call(this), width: dimensions.Width, height: dimensions.Height, aspectRatio: dimensions.AspectRatio};
+	};
 	_['private'].m_dimensions=null;
 });

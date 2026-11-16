@@ -3,7 +3,9 @@ var DynamicModule=Function.extend(Object, function () {
 	DynamicModule=_[DynamicModule];
 	function DynamicModule(name) {
 		_['base'].apply(this, arguments);
-		this.name=name;
-		this.time=new Date().toLocaleTimeString();
+		this.Name=name;
+		this.Time=new Date().toLocaleTimeString();
 	}
+	_['public'].Name=null;
+	_['public'].Time=null;
 });
