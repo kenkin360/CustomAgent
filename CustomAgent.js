@@ -597,10 +597,7 @@ Summarize these results and answer the user in natural language.
 			, aspectRatio: ratioOut
 			, ...('video'===artifact?.kind?{includedArtifact: $this.DescribeArtifact(artifact)}:{})
 			, ...(edited?{
-				includedImage: {
-					base64: edited.base64
-					, mimeType: edited.mimeType
-				}
+				includedImage: edited
 			}:{})
 		});
 	};
