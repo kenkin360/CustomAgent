@@ -5,6 +5,17 @@ import * as fabric from 'fabric';
 import { Bundle } from './Bundle.js';
 import { Resource } from './Resource.js';
 
+var Progress=Function.extend(Object, function () {
+	var _=this(Progress);
+	Progress=_[Progress];
+	function Progress(file='', completed=0, total=0) {
+		_['base'].apply(this, arguments);
+		this.File=file;
+		this.Completed=completed;
+		this.Total=total;
+	}
+});
+
 var App=Function.extend(React.Component, function () {
 	var _=this(App);
 	App=_[App];
@@ -15,7 +26,7 @@ var App=Function.extend(React.Component, function () {
 		$this.m_agent=null;
 		$this.m_error=null;
 		$this.m_loading=false;
-		$this.m_progress={File: '', Completed: 0, Total: Bundle.Config.length};
+		$this.m_progress=new Progress('', 0, Bundle.Config.length);
 		$this.m_reload=()=>_(this).Load(this);
 	}
 
@@ -29,10 +40,10 @@ var App=Function.extend(React.Component, function () {
 		if ($this.m_loading) return;
 		$this.m_loading=true;
 		$this.m_error=null;
-		$this.m_progress={File: '', Completed: 0, Total: Bundle.Config.length};
+		$this.m_progress=new Progress('', 0, Bundle.Config.length);
 		component.forceUpdate();
 		Bundle.Load((progress)=>{
-			$this.m_progress=progress;
+			$this.m_progress=new Progress(progress.File, progress.Completed, progress.Total);
 			component.forceUpdate();
 		}).then((loaded)=>{
 			$this.m_loading=false;

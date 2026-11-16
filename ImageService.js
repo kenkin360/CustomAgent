@@ -2,9 +2,8 @@ var ImageService=Function.extend(Object, function () {
 	var _=this(ImageService);
 	ImageService=_[ImageService];
 
-	function ImageService(flow) {
+	function ImageService() {
 		_['base'].apply(this, arguments);
-		_(this).m_flow=flow;
 	}
 	ImageService.ModelDisplayName='🍌 Nano Banana 2.1';
 
@@ -31,7 +30,7 @@ var ImageService=Function.extend(Object, function () {
 		if (!output||typeof output.base64!=='string'||!/^image\/(png|jpeg|webp)$/.test(output.mimeType)) return null;
 		let dimensions=await this.GetDimensions(output);
 		return {
-			...image, kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
+			...(image?.ToJSON?image.ToJSON():image), kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
 			, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
 			, ...dimensions
 			, prompt: `Local runtime edit: ${actionName}`
@@ -44,7 +43,7 @@ var ImageService=Function.extend(Object, function () {
 	_['private'].GetContent=async function (media) {
 		if (typeof media?.base64==='string'&&media.base64&&typeof media.mimeType==='string'&&media.mimeType) return media;
 		if (!media?.mediaId) throw new Error('The image has neither content nor a mediaId.');
-		let content=await this.m_flow.media.getBase64({mediaId: media.mediaId});
+		let content=await Flow.media.getBase64({mediaId: media.mediaId});
 		if (typeof content?.base64!=='string'||!content.base64) throw new Error('Flow did not return the selected image content.');
 		let mimeType=content.mimeType||media.mimeType;
 		if (!mimeType) throw new Error('Flow did not return the selected image MIME type.');
@@ -52,7 +51,7 @@ var ImageService=Function.extend(Object, function () {
 	};
 
 	_['public'].Select=async function () {
-		let selected=await _(this).m_flow.media.select({filter: 'image'});
+		let selected=await Flow.media.select({filter: 'image'});
 		if (!selected) return null;
 		selected=await _(this).GetContent(selected);
 		let dimensions=await this.GetDimensions(selected);
@@ -70,7 +69,7 @@ var ImageService=Function.extend(Object, function () {
 	};
 
 	_['public'].Capture=async function () {
-		let flow=_(this).m_flow;
+		let flow=Flow;
 		let photo=await flow.camera.capture({facingMode: 'user'});
 		if (!photo) return null;
 		let dimensions=await this.GetDimensions(photo);
@@ -93,7 +92,7 @@ var ImageService=Function.extend(Object, function () {
 	};
 
 	_['public'].Generate=async function (prompt, image, ratio, index) {
-		let flow=_(this).m_flow;
+		let flow=Flow;
 		let mediaId=image?.mediaId;
 		let aspectRatio=ratio==='original'?(image?this.GetAspectRatio(await this.GetDimensions(image)):undefined):ratio;
 		if (image&&!mediaId) {
@@ -126,13 +125,12 @@ var ImageService=Function.extend(Object, function () {
 
 	_['public'].Download=function (image) {
 		if (!image) return Promise.resolve();
-		return _(this).m_flow.download({
+		return Flow.download({
 			base64: image.base64
 			, mimeType: image.mimeType||'image/png'
 			, filename: `revised_concept_${Date.now()}.${image.mimeType.includes('jpeg')||image.mimeType.includes('jpg')?'jpg':'png'}`
 		});
 	};
 
-	_['private'].m_flow=null;
 });
 

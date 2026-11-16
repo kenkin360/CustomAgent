@@ -40,6 +40,11 @@ var Bundle=Function.extend(Function, function () {
 		, ['HtmlNode', 'https://esm.sh/gh/kenkin360/FlowerX/HtmlNode.js?raw']
 		, ['ImageService', Bundle.CustomAgent('ImageService.js')]
 		, ['VideoService', Bundle.CustomAgent('VideoService.js')]
+		, ['AgentState', Bundle.CustomAgent('State.js')]
+		, ['Session', Bundle.CustomAgent('Session.js')]
+		, ['View', Bundle.CustomAgent('View.js')]
+		, ['Modules', Bundle.CustomAgent('Modules.js')]
+		, ['Sources', Bundle.CustomAgent('Sources.js')]
 		, ['cv', 'https://esm.sh/gh/TechStark/opencv-js/dist/opencv.js?raw', 'Mat']
 		, ['agentTemplate', Bundle.CustomAgent('views/agent.html.js')]
 	];

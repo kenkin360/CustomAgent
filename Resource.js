@@ -1,5 +1,68 @@
 import './Function.extend.js';
 
+var Identity=Function.extend(Object, function () {
+	var _=this(Identity);
+	Identity=_[Identity];
+	function Identity(name, url, readyMember) {
+		_['base'].apply(this, arguments);
+		this.Name=name;
+		this.Url=url;
+		this.ReadyMember=readyMember;
+	}
+});
+
+var Completion=Function.extend(Object, function () {
+	var _=this(Completion);
+	Completion=_[Completion];
+	function Completion(resolve, reject) {
+		_['base'].apply(this, arguments);
+		this.Resolve=resolve;
+		this.Reject=reject;
+		this.Finished=false;
+		this.Resolved=null;
+		this.Pending=null;
+	}
+});
+
+var ElementState=Function.extend(Object, function () {
+	var _=this(ElementState);
+	ElementState=_[ElementState];
+	function ElementState() {
+		_['base'].apply(this, arguments);
+		this.Element=null;
+		this.Created=false;
+		this.LoadHandler=null;
+		this.ErrorHandler=null;
+		this.EvaluationHandler=null;
+	}
+});
+
+var Timers=Function.extend(Object, function () {
+	var _=this(Timers);
+	Timers=_[Timers];
+	function Timers() {
+		_['base'].apply(this, arguments);
+		this.Interval=null;
+		this.Timeout=null;
+		this.TimeoutHandler=null;
+	}
+});
+
+var LoadState=Function.extend(Object, function () {
+	var _=this(LoadState);
+	LoadState=_[LoadState];
+	function LoadState(name, url, readyMember, resolve, reject) {
+		_['base'].apply(this, arguments);
+		this.Identity=new Identity(name, url, readyMember);
+		this.Completion=new Completion(resolve, reject);
+		this.Dom=new ElementState();
+		this.Timers=new Timers();
+	}
+	for (let [owner, names] of [['Identity', ['Name', 'Url', 'ReadyMember']], ['Completion', ['Resolve', 'Reject', 'Finished', 'Resolved', 'Pending']], ['Dom', ['Element', 'Created', 'LoadHandler', 'ErrorHandler', 'EvaluationHandler']], ['Timers', ['Interval', 'Timeout', 'TimeoutHandler']]]) {
+		for (let name of names) Object.defineProperty(_['public'], name, {get() { return this[owner][name]; }, set(value) { this[owner][name]=value; }});
+	}
+});
+
 var Resource=Function.extend(Promise, function () {
 	var _=this(Resource);
 	Resource=_[Resource];
@@ -15,23 +78,7 @@ var Resource=Function.extend(Promise, function () {
 			resolve=done;
 			reject=fail;
 		})(function () {
-			_(this).m_state={
-				Name: name
-				, Url: url
-				, ReadyMember: readyMember
-				, Resolve: resolve
-				, Reject: reject
-				, Element: null
-				, Created: false
-				, Finished: false
-				, Pending: null
-				, Resolved: null
-				, Interval: null
-				, Timeout: null
-				, LoadHandler: null
-				, ErrorHandler: null
-				, TimeoutHandler: null
-			};
+			_(this).m_state=new LoadState(name, url, readyMember, resolve, reject);
 		});
 	}
 

@@ -2,9 +2,8 @@ var VideoService=Function.extend(Object, function () {
 	var _=this(VideoService);
 	VideoService=_[VideoService];
 
-	function VideoService(flow) {
+	function VideoService() {
 		_['base'].apply(this, arguments);
-		_(this).m_flow=flow;
 	}
 	VideoService.ModelDisplayName='Omni 1.2 Flash';
 
@@ -14,7 +13,7 @@ var VideoService=Function.extend(Object, function () {
 		if (typeof image?.base64!=='string'||!image.base64||!/^image\//.test(image.mimeType)) {
 			throw new Error('A reference image needs a mediaId or image base64 and MIME type.');
 		}
-		let upload=await this.m_flow.upload({base64: image.base64, mimeType: image.mimeType, name: image.title||'Video reference image'});
+		let upload=await Flow.upload({base64: image.base64, mimeType: image.mimeType, name: image.title||'Video reference image'});
 		if (!upload?.mediaId) throw new Error('Flow did not return an image mediaId.');
 		return upload.mediaId;
 	};
@@ -32,7 +31,7 @@ var VideoService=Function.extend(Object, function () {
 
 		let firstFrameImageMediaId=firstFrameImage?await _(this).ResolveImageId(firstFrameImage):undefined;
 		let referenceImageMediaIds=referenceImages?.length?await Promise.all(referenceImages.map((image)=>_(this).ResolveImageId(image))):undefined;
-		let result=await _(this).m_flow.generate.video({
+		let result=await Flow.generate.video({
 			prompt: prompt.trim()
 			, modelDisplayName: VideoService.ModelDisplayName
 			, aspectRatio
@@ -59,5 +58,4 @@ var VideoService=Function.extend(Object, function () {
 		};
 	};
 
-	_['private'].m_flow=null;
 });
