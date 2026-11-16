@@ -123,7 +123,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		await $this.m_modules.GetStartup();
 		let state=$this.m_state;
 		let image=await $this.ToLegacyMedia(state.ActiveImage);
-		let artifact=await $this.ToLegacyMedia(state.CurrentArtifact);
+		let artifact=state.CurrentArtifact===state.ActiveImage?image:await $this.ToLegacyMedia(state.CurrentArtifact);
 		let result=await $this.ExecuteAction(action, {image, artifact, track, source, Type});
 		if (result.artifact) {
 			let artifact=result.artifact;
