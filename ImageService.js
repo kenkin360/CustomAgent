@@ -26,6 +26,21 @@ var ImageService=Function.extend(Object, function () {
 		return width/a+':'+height/a;
 	};
 
+	_['public'].ReadActionResult=async function (value, image, actionName) {
+		let output=value&&typeof value==='object'&&'image' in value?value.image:value;
+		if (!output||typeof output.base64!=='string'||!/^image\/(png|jpeg|webp)$/.test(output.mimeType)) return null;
+		let dimensions=await this.GetDimensions(output);
+		return {
+			...image, kind: 'image', id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
+			, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
+			, ...dimensions
+			, prompt: `Local runtime edit: ${actionName}`
+			, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+			, aspectRatio: this.GetAspectRatio(dimensions)
+			, title: output.title||`${image?.title||'Image'} · ${actionName}`
+		};
+	};
+
 	_['private'].GetContent=async function (media) {
 		if (typeof media?.base64==='string'&&media.base64&&typeof media.mimeType==='string'&&media.mimeType) return media;
 		if (!media?.mediaId) throw new Error('The image has neither content nor a mediaId.');
