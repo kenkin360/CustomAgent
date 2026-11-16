@@ -1,59 +1,3 @@
-var Descriptor=Function.extend(Object, function () {
-	var _=this(Descriptor);
-	Descriptor=_[Descriptor];
-	function Descriptor(value) {
-		_['base'].apply(this, arguments);
-		let $this=_(this);
-		$this.m_value=value.value;
-		$this.m_get=value.get;
-		$this.m_set=value.set;
-		$this.m_flags=(value.configurable?1:0)|(value.enumerable?2:0)|(value.writable?4:0);
-	}
-	Descriptor.Capture=function (target, name) {
-		let value=Object.getOwnPropertyDescriptor(target, name);
-		return value?new Descriptor(value):null;
-	};
-	_['public'].Restore=function (target, name) {
-		let $this=_(this);
-		let descriptor={configurable: !!($this.m_flags&1), enumerable: !!($this.m_flags&2)};
-		if ($this.m_get||$this.m_set) {
-			descriptor.get=$this.m_get;
-			descriptor.set=$this.m_set;
-		}
-		else {
-			descriptor.value=$this.m_value;
-			descriptor.writable=!!($this.m_flags&4);
-		}
-		Object.defineProperty(target, name, descriptor);
-	};
-	_['private'].m_value=null;
-	_['private'].m_get=null;
-	_['private'].m_set=null;
-	_['private'].m_flags=null;
-});
-
-var Installation=Function.extend(Object, function () {
-	var _=this(Installation);
-	Installation=_[Installation];
-	function Installation(name, previousGlobal, previousModule, previousSource) {
-		_['base'].apply(this, arguments);
-		this.Name=name;
-		this.PreviousGlobal=previousGlobal;
-		this.PreviousModule=previousModule;
-		this.PreviousSource=previousSource;
-	}
-});
-
-var DynamicModule=Function.extend(Object, function () {
-	var _=this(DynamicModule);
-	DynamicModule=_[DynamicModule];
-	function DynamicModule(name) {
-		_['base'].apply(this, arguments);
-		this.name=name;
-		this.time=new Date().toLocaleTimeString();
-	}
-});
-
 var Modules=Function.extend(Object, function () {
 	var _=this(Modules);
 	Modules=_[Modules];
@@ -112,7 +56,7 @@ var Modules=Function.extend(Object, function () {
 		if (value.Run!==undefined&&typeof value.Run!=='function') throw new Error(name+' has an invalid Run method.');
 		let installation=new Installation(name, previousGlobal, Descriptor.Capture(runtime.Modules, name), this.m_sources.GetInstalled(name));
 		runtime.Modules[name]=value;
-		this.m_sources.SetInstalled(name, new InstalledSource(source, remote));
+		this.m_sources.SetInstalled(name, new Source(name, source, undefined, remote));
 		if (track) this.m_versions.push(installation);
 		return {message: `${name} loaded. Callable: ${typeof value.Run==='function'?'Run':'(none)'}. Reversible installations: ${this.m_versions.length}.`};
 	};

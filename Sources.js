@@ -1,31 +1,10 @@
-var SourceEntry=Function.extend(Object, function () {
-	var _=this(SourceEntry);
-	SourceEntry=_[SourceEntry];
-	function SourceEntry(name, url, readyMember) {
-		_['base'].apply(this, arguments);
-		this.Name=name;
-		this.Url=url;
-		this.ReadyMember=readyMember;
-	}
-});
-
-var InstalledSource=Function.extend(Object, function () {
-	var _=this(InstalledSource);
-	InstalledSource=_[InstalledSource];
-	function InstalledSource(source, remote) {
-		_['base'].apply(this, arguments);
-		this.Source=source;
-		this.Remote=remote;
-	}
-});
-
 var Sources=Function.extend(Object, function () {
 	var _=this(Sources);
 	Sources=_[Sources];
 	function Sources(entries, hostSourceUrl) {
 		_['base'].apply(this, arguments);
 		let $this=_(this);
-		$this.m_entries=[...(entries||[]), ['DrawRectangle', Bundle.CustomAgent('DrawRectangle.js')], ['Upscale', Bundle.CustomAgent('Upscale.js')]].map(([name, url, readyMember])=>new SourceEntry(name, url, readyMember));
+		$this.m_entries=[...(entries||[]), ['DrawRectangle', Bundle.CustomAgent('DrawRectangle.js')], ['Upscale', Bundle.CustomAgent('Upscale.js')]].map(([name, url, readyMember])=>new Source(name, url, readyMember));
 		$this.m_compiled=new Map();
 		$this.m_error=null;
 		try { $this.m_compiled=$this.Parse(hostSourceUrl); }
@@ -64,10 +43,10 @@ var Sources=Function.extend(Object, function () {
 	};
 	_['public'].ReadRemoteSource=async function (args={}) {
 		let entries=_(this).m_entries;
-		if (typeof args.name!=='string') return {message: `Remote source entries: ${JSON.stringify(entries.map((entry)=>({name: entry.Name, url: entry.Url, readyMember: entry.ReadyMember})))}`};
-		let entry=entries.find((item)=>item.Name===args.name||item.Url.split(/[?#]/)[0].split('/').pop()===args.name);
+		if (typeof args.name!=='string') return {message: `Remote source entries: ${JSON.stringify(entries.map((entry)=>({name: entry.Name, url: entry.Value, readyMember: entry.ReadyMember})))}`};
+		let entry=entries.find((item)=>item.Name===args.name||item.Value.split(/[?#]/)[0].split('/').pop()===args.name);
 		if (!entry) throw new Error('Remote source not found: '+args.name);
-		let response=await fetch(entry.Url);
+		let response=await fetch(entry.Value);
 		if (!response.ok) throw new Error(`Failed to read ${args.name}: HTTP ${response.status}`);
 		return {message: `${entry.Name}:\n${await response.text()}`};
 	};
@@ -76,8 +55,8 @@ var Sources=Function.extend(Object, function () {
 		if (typeof args.name!=='string') return {message: `Installed modules: ${JSON.stringify(this.InstalledNames())}`};
 		let entry=sources.get(args.name);
 		if (!entry) throw new Error('Installed module not found: '+args.name);
-		if (!entry.Remote) return {message: `${args.name}:\n${entry.Source}`};
-		let response=await fetch(entry.Source);
+		if (!entry.Remote) return {message: `${args.name}:\n${entry.Value}`};
+		let response=await fetch(entry.Value);
 		if (!response.ok) throw new Error(`Failed to read ${args.name}: HTTP ${response.status}`);
 		return {message: `${args.name}:\n${await response.text()}`};
 	};
