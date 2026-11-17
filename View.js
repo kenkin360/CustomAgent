@@ -70,37 +70,52 @@ var View=Function.extend(Object, function () {
 
 	_['public'].Mounted=function () { return [..._(this).m_mounted.keys()]; };
 
-	_['public'].Update=function (state, text, select) {
-		let root=_(this).m_root;
-		if (!root) { return; }
-
-		let node=(role)=>new HtmlNode(this.Node(role));
-		let picture=node('image');
-		let video=node('video');
+	_['private'].UpdateImage=function (media) {
+		let picture=new HtmlNode(this.Node('image'));
 		let image=picture.GetElement();
-		let movie=video.GetElement();
-		let showImage=state.ActiveMedia instanceof Media.Image&&!!state.ActiveMedia.Data;
-		let showVideo=state.ActiveMedia instanceof Media.Video&&!!state.ActiveMedia.Data;
-		if (showImage&&image) {
-			let url=this.Url(state.ActiveMedia);
+		if (media instanceof Media.Image&&media.Data) {
+			let url=this.Url(media);
 			if (image.src!==url) { picture.SetSource(url); }
-		}
-		else if (image?.getAttribute('src')) { image.removeAttribute('src'); }
 
-		picture.Show(showImage);
-		if (showVideo&&movie) {
-			let url=this.Url(state.ActiveMedia);
-			if (movie.src!==url) { movie.src=url; }
+			picture.Show(true);
+			return media.Width&&media.Height?`${media.Width} × ${media.Height}`:'';
 		}
-		else if (movie?.getAttribute('src')) {
+
+		image.removeAttribute('src');
+		picture.Show(false);
+		return null;
+	};
+
+	_['private'].UpdateVideo=function (media) {
+		let video=new HtmlNode(this.Node('video'));
+		let movie=video.GetElement();
+		if (media instanceof Media.Video&&media.Data) {
+			let url=this.Url(media);
+			if (movie.src!==url) { movie.src=url; }
+
+			video.Show(true);
+			return `${media.DurationSeconds||'?'} s`;
+		}
+
+		if (movie.hasAttribute('src')) {
 			movie.pause();
 			movie.removeAttribute('src');
 			movie.load();
 		}
 
-		video.Show(showVideo);
-		node('empty').SetStyle('display', showImage||showVideo?'none':'block');
-		node('image-ratio').SetText(showImage&&state.ActiveMedia.Width&&state.ActiveMedia.Height?`${state.ActiveMedia.Width} × ${state.ActiveMedia.Height}`:showVideo?`${state.ActiveMedia.DurationSeconds||'?'} s`:'');
+		video.Show(false);
+		return null;
+	};
+
+	_['public'].Update=function (state, text, select) {
+		let root=_(this).m_root;
+		if (!root) { return; }
+
+		let node=(role)=>new HtmlNode(this.Node(role));
+		let imageText=_(this).UpdateImage(state.ActiveMedia);
+		let videoText=_(this).UpdateVideo(state.ActiveMedia);
+		node('empty').SetStyle('display', imageText===null&&videoText===null?'block':'none');
+		node('image-ratio').SetText(imageText??videoText??'');
 		node('generating').SetStyle('display', state.IsGenerating?'flex':'none');
 		this.Localize(text);
 		new HtmlNode(root.querySelector('[data-action="send"]')).SetText(state.IsConsulting?text('stop'):text('send'));
