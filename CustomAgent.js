@@ -358,14 +358,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 
 		try {
-			let response=await Flow.generate.text('你是否了解自己的能力?', {systemInstruction: `
+			let response=await $this.RequestResponse('你是否了解自己的能力?', {systemInstruction: `
 你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，描述目前可用的能力。以下提供原碼檔案清單與執行狀態；需要原碼內容時可使用對應讀取操作。請依瀏覽器語系或使用者對話語言回覆；尚無語言線索時使用英文。整個答覆必須是單一標準 JSON 物件，例如 {"reply":"歡迎訊息"}，不要使用 Markdown 程式碼區塊或額外文字。
 ${runtime.message}
 啟動結果：${setupError||'success'}
 瀏覽器語系：${navigator.language}
 `});
 			if (!app.GetState().messages.length) {
-				app.Reply($this.ReadControl(response.text, false).reply);
+				app.Reply(response.reply);
 			}
 		}
 		catch (error) {
@@ -373,13 +373,16 @@ ${runtime.message}
 		}
 	};
 
-	_['private'].ReadControl=function (value, allowAction=true) {
+	_['private'].ReadResponse=function (value, allowAction=true) {
 		let raw=String(value??'');
 		let fallback=()=>{
 			let label='zh'===this.m_view.GetLocale()?'回應格式不正確，未執行任何動作。原始回應：\n':'Invalid response format; no action was performed. Original response:\n';
 			return {reply: label+raw, accumulatedChanges: null, suggestedPrompt: null, aspectRatio: null, attemptPlan: [], localAction: null, source: null, Type: null, Valid: false};
 		};
 		let match=raw.match(/^\s*(\{[\s\S]*\})\s*$/);
+		if (!match) {
+			match=raw.match(/^\s*```json\s*\n\s*(\{[\s\S]*\})\s*\n```\s*$/i);
+		}
 		if (!match) {
 			return fallback();
 		}
@@ -431,6 +434,11 @@ ${runtime.message}
 			return fallback();
 		}
 		return {...data, Type, Valid: true};
+	};
+
+	_['private'].RequestResponse=async function (prompt, options, allowAction=false) {
+		let response=await Flow.generate.text(prompt, options);
+		return this.ReadResponse(response?.text, allowAction);
 	};
 
 	_['private'].Instruction=function (runtime) {
@@ -522,10 +530,8 @@ Choose the next action, revise the plan, or answer the user based on the actual 
 			let options={systemInstruction: $this.Instruction(runtime)};
 			if (image) options.images=[{base64: image.base64, mimeType: image.mimeType}];
 
-			let response=await Flow.generate.text(`${request}. `, options);
+			let data=await $this.RequestResponse(`${request}. `, options, true);
 			if (turn?.signal.aborted) return;
-
-			let data=$this.ReadControl(response.text);
 			answer=data.reply;
 
 			if (data.Valid) {
@@ -559,11 +565,11 @@ Choose the next action, revise the plan, or answer the user based on the actual 
 				if (turn?.signal.aborted) return;
 
 				if (result.conversationReset) {
-					let fresh=await Flow.generate.text('.', {systemInstruction: `
+					let fresh=await $this.RequestResponse('.', {systemInstruction: `
 App 已清空對話。以使用者這次要求的語言回覆。整個答覆只輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，不要附加文字或 Markdown。
 `});
 					if (turn?.signal.aborted) return;
-					app.Reply($this.ReadControl(fresh.text, false).reply);
+					app.Reply(fresh.reply);
 					return;
 				}
 
@@ -603,15 +609,15 @@ Actual action results:
 ${reports.map(JSON.stringify).join('\n')}
 Summarize these results and answer the user in natural language.
 `;
-			let response=await Flow.generate.text(`${prompt}. `, {systemInstruction: `
+			let response=await $this.RequestResponse(`${prompt}. `, {systemInstruction: `
 依使用者的語言，以 App 回報的結果為依據回答。整個答覆只輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，不要附加文字或 Markdown。
 `});
 			if (turn?.signal.aborted) return;
-			answer=$this.ReadControl(response.text, false).reply;
+			answer=response.reply;
 		}
 
 		if (!answer) {
-			answer=$this.ReadControl('', false).reply;
+			answer=$this.ReadResponse('', false).reply;
 		}
 		if (turn?.signal.aborted) return;
 
@@ -645,11 +651,11 @@ App event: ${event}
 Actual result: ${JSON.stringify(details)}
 Reply briefly to the user in the language of the current conversation.
 `;
-		let response=await Flow.generate.text(`${prompt}. `, {systemInstruction: `
+		let response=await _(this).RequestResponse(`${prompt}. `, {systemInstruction: `
 根據 App 回報的結果，依使用者當前對話語言簡短回覆。整個答覆只輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，不要附加文字或 Markdown。
 `});
 
-		this.Reply(_(this).ReadControl(response.text, false).reply, image?{includedMedia: image}:{});
+		this.Reply(response.reply, image?{includedMedia: image}:{});
 	};
 
 	_['private'].m_state=null;
