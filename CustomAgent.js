@@ -359,63 +359,78 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 		try {
 			let response=await Flow.generate.text('你是否了解自己的能力?', {systemInstruction: `
-你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，描述目前可用的能力。以下提供原碼檔案清單與執行狀態；需要原碼內容時可使用對應讀取操作。請依瀏覽器語系或使用者對話語言回覆；尚無語言線索時使用英文。
+你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，描述目前可用的能力。以下提供原碼檔案清單與執行狀態；需要原碼內容時可使用對應讀取操作。請依瀏覽器語系或使用者對話語言回覆；尚無語言線索時使用英文。整個答覆必須是單一標準 JSON 物件，例如 {"reply":"歡迎訊息"}，不要使用 Markdown 程式碼區塊或額外文字。
 ${runtime.message}
 啟動結果：${setupError||'success'}
 瀏覽器語系：${navigator.language}
 `});
-			if (response.text?.trim()&&!app.GetState().messages.length) app.Reply(response.text.trim());
+			if (!app.GetState().messages.length) {
+				app.Reply($this.ReadControl(response.text, false).reply);
+			}
 		}
 		catch (error) {
 			app.ReportError(error);
 		}
 	};
 
-	_['private'].ReadControl=function (value) {
-		let marker=String.fromCharCode(96).repeat(3);
-		let pattern=new RegExp(`${marker}json\\s*([\\s\\S]*?)\\s*${marker}`, 'gi');
-
-		for (let block of [...String(value).matchAll(pattern)].reverse()) {
-			try {
-				let data=JSON.parse(block[1]);
-				if (!data||!Object.prototype.hasOwnProperty.call(data, 'localAction')) continue;
-
-				let remaining=(value.slice(0, block.index)+value.slice(block.index+block[0].length)).trim();
-				let source=null;
-				let Type=null;
-
-				if ('loadModule'===data.localAction?.name) {
-					let sourceBlocks=[...remaining.matchAll(/(?:^|\n)```(javascript|js|text|url)\s*\n([\s\S]*?)\n```(?=\s*(?:\n|$))/gi)];
-					let last=sourceBlocks.at(-1);
-
-					if (last) {
-						Type={javascript: Resource.Inline, js: Resource.Inline, text: Resource.Module, url: Resource.Module}[last[1].toLowerCase()];
-						source=Type===Resource.Module?last[2].trim():last[2];
-						remaining=(remaining.slice(0, last.index)+remaining.slice(last.index+last[0].length)).trim();
-					}
-				}
-
-				return {Data: data, Text: remaining, Source: source, Type};
-			}
-			catch (error) {
-				console.warn('Invalid conversation control', error);
-			}
+	_['private'].ReadControl=function (value, allowAction=true) {
+		let raw=String(value??'');
+		let fallback=()=>{
+			let label='zh'===this.m_view.GetLocale()?'回應格式不正確，未執行任何動作。原始回應：\n':'Invalid response format; no action was performed. Original response:\n';
+			return {reply: label+raw, accumulatedChanges: null, suggestedPrompt: null, aspectRatio: null, attemptPlan: [], localAction: null, source: null, Type: null, Valid: false};
+		};
+		let match=raw.match(/^\s*(\{[\s\S]*\})\s*$/);
+		if (!match) {
+			return fallback();
 		}
 
+		let valueObject=null;
 		try {
-			let data=JSON.parse(String(value).trim());
-			if (data&&Object.prototype.hasOwnProperty.call(data, 'localAction')) {
-				return {Data: data, Text: '', Source: null, Type: null};
-			}
+			valueObject=JSON.parse(match[1]);
 		}
 		catch (error) {
+			return fallback();
+		}
+		if (!valueObject||'object'!==typeof valueObject||Array.isArray(valueObject)) {
+			return fallback();
 		}
 
-		if (/(?:^|\n)```json\s*\n/i.test(value)&&/(?:^|\n)```(?:javascript|js)\s*\n/i.test(value)) {
-			throw new Error('Module code was returned with an invalid action decision; nothing was installed.');
+		let data=Object.assign({
+			reply: ''
+			, accumulatedChanges: null
+			, suggestedPrompt: null
+			, aspectRatio: null
+			, attemptPlan: []
+			, localAction: null
+			, source: null
+			, sourceType: null
+		}, valueObject);
+		if ('string'!==typeof data.reply
+			||null!==data.accumulatedChanges&&(!Array.isArray(data.accumulatedChanges)||!data.accumulatedChanges.every((item)=>'string'===typeof item))
+			||null!==data.suggestedPrompt&&'string'!==typeof data.suggestedPrompt
+			||null!==data.aspectRatio&&!['original', '1:1', '16:9', '9:16', '4:3', '3:4'].includes(data.aspectRatio)
+			||!Array.isArray(data.attemptPlan)||!data.attemptPlan.every((item)=>item&&'object'===typeof item&&!Array.isArray(item)&&'string'===typeof item.action)
+			||null!==data.localAction&&(false===allowAction||'object'!==typeof data.localAction||Array.isArray(data.localAction)||'string'!==typeof data.localAction.name||!data.localAction.name||!data.localAction.arguments||'object'!==typeof data.localAction.arguments||Array.isArray(data.localAction.arguments))
+			||null!==data.source&&'string'!==typeof data.source
+			||null!==data.sourceType&&'string'!==typeof data.sourceType
+			||!data.reply.trim()&&!data.localAction) {
+			return fallback();
 		}
 
-		return {Data: null, Text: String(value).trim(), Source: null, Type: null};
+		let Type=null;
+		if (data.localAction&&!data.attemptPlan.some((item)=>item.action===data.localAction.name)) {
+			return fallback();
+		}
+		if ('loadModule'===data.localAction?.name) {
+			if (!data.source||!['javascript', 'js', 'text', 'url'].includes(data.sourceType)) {
+				return fallback();
+			}
+			Type='javascript'===data.sourceType||'js'===data.sourceType?Resource.Inline:Resource.Module;
+		}
+		else if (null!==data.source||null!==data.sourceType) {
+			return fallback();
+		}
+		return {...data, Type, Valid: true};
 	};
 
 	_['private'].Instruction=function (runtime) {
@@ -427,13 +442,13 @@ ${runtime.message}
 實際能力：${runtime.message}
 本次對話中經由 loadModule 載入的模組：${dynamicList}
 
-需要操作時，在答覆最後附一個 json 程式碼區塊，包含 {"attemptPlan":[{"action":"操作名稱","attempts":1,"reason":"目的與重試條件"}],"localAction":{"name":"操作名稱","arguments":{}}}。一般討論直接以文字答覆。App 每次執行一項操作並回傳結果；依結果繼續、調整或答覆。
+每次答覆都只輸出一個完整的標準 JSON 物件，不要使用 Markdown 程式碼區塊或附加文字。一般討論回覆 {"reply":"給使用者看的文字"}。需要操作時回覆 {"reply":"","attemptPlan":[{"action":"操作名稱","attempts":1,"reason":"目的與重試條件"}],"localAction":{"name":"操作名稱","arguments":{}}}；同一次僅執行一項操作，App 回傳結果後再依結果繼續、調整或答覆。使用 JSON 標準語法，字串內的換行與引號須正確跳脫。
 readCompiledSource 空參數列出啟動時已完整拆解的固定 host 檔案，{file} 取得完整原碼；readRemoteSource 空參數列出 Bundle.Config 等遠端來源，{name} 可重新取得其內容；readInstalledSource 空參數列出已安裝模組，{name} 取得安裝時保留的完整原碼，遠端安裝者可重新取得。inspectRuntime 檢查現有函數、模組及原碼入口。
-loadModule 接收獨立的 JavaScript 程式碼或遠端腳本 URL。需要載入時，先輸出 javascript 程式碼區塊（原碼）或 text 程式碼區塊（URL），再於答覆最後輸出操作控制 JSON，其 localAction 為 {"name":"loadModule","arguments":{"name":"模組名稱"}}，並在 attemptPlan 列出 loadModule。自行撰寫類型時，以頂層 var 和 Function.extend(Base, factory) 宣告，將建構子、方法及靜態成員寫在類別定義內；需要完整範例時，可透過 readInstalledSource 查看 DrawRectangle 原碼。可呼叫的模組提供靜態 Run。
+loadModule 的原碼或遠端腳本 URL 放在同一個 JSON 物件的 source 字串；sourceType 為 javascript 或 js（原碼），或 text 或 url（遠端腳本 URL）。localAction 為 {"name":"loadModule","arguments":{"name":"模組名稱"}}，並在 attemptPlan 列出 loadModule。自行撰寫類型時，以頂層 var 和 Function.extend(Base, factory) 宣告，將建構子、方法及靜態成員寫在類別定義內；需要完整範例時，可透過 readInstalledSource 查看 DrawRectangle 原碼。可呼叫的模組提供靜態 Run。
 直接以模組名稱作為操作名稱呼叫其 Run；rollback 撤銷上一項模組安裝；resetConversation 清空對話。需要實作新功能時可讀程式碼並撰寫、載入模組。
 generateVideo 可由使用者提出影片生成要求時執行，參數為 {prompt,aspectRatio,durationSeconds,resolution}；aspectRatio 為 16:9 或 9:16，durationSeconds 為 3 至 15，resolution 為 720p 或 360p。可選 useCurrentImageAsFirstFrame: true 作為首幀，或 useCurrentImageAsReference: true 作為參考；也可傳 firstFrameImageMediaId、referenceImageMediaIds，或 sourceVideoMediaId 作為影片編輯來源。首幀不得與參考圖或來源影片同時使用。完成後影片自動存入 Flow Assets，並顯示在媒體區。
 可用模組可使用瀏覽器標準 API，Run 收到參數與 {artifact,image,track,source,Type}；有產物時回傳 {message,artifact:{mimeType,base64,...}} 或直接回傳具體的 Media.Image、Media.Video，種類以類型判斷；影片可保留 mediaId 與時長，檔案 MIME 類型必須明確。既有影像模組仍可回傳 {message,image:{base64,mimeType}}。UI 可透過 AppRuntime.UI.Mount 掛入介面。模組可以只保留類型與靜態方法，若自行建立單例，應在 Function.extend 的類別定義內完成。
-若有待使用者確認的生成修改，可於 JSON 加入 accumulatedChanges、suggestedPrompt、aspectRatio。操作結果與錯誤由 App 回傳；答覆使用者時以自然語言說明結果。
+若有待使用者確認的生成修改，在同一個 JSON 物件中加入 accumulatedChanges（字串陣列）、suggestedPrompt、aspectRatio，即使沒有 localAction 也必須回傳。reply 是唯一會顯示給使用者的文字。操作結果與錯誤由 App 回傳；依使用者語言在 reply 說明結果。
 `;
 	};
 
@@ -510,11 +525,10 @@ Choose the next action, revise the plan, or answer the user based on the actual 
 			let response=await Flow.generate.text(`${request}. `, options);
 			if (turn?.signal.aborted) return;
 
-			let control=$this.ReadControl(response.text);
-			answer=control.Text;
+			let data=$this.ReadControl(response.text);
+			answer=data.reply;
 
-			let data=control.Data;
-			if (data) {
+			if (data.Valid) {
 				structured=true;
 				if (Array.isArray(data.accumulatedChanges)) {
 					changesOut=data.accumulatedChanges.filter((item)=>'string'===typeof item);
@@ -541,16 +555,15 @@ Choose the next action, revise the plan, or answer the user based on the actual 
 			try {
 				if (turn?.signal.aborted) return;
 
-				let result=await app.RunAction(action, true, control.Source, control.Type);
+				let result=await app.RunAction(action, true, data.source, data.Type);
 				if (turn?.signal.aborted) return;
 
 				if (result.conversationReset) {
 					let fresh=await Flow.generate.text('.', {systemInstruction: `
-App 已清空對話。以使用者這次要求的語言自然回覆。
+App 已清空對話。以使用者這次要求的語言回覆。整個答覆只輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，不要附加文字或 Markdown。
 `});
 					if (turn?.signal.aborted) return;
-					if (!fresh.text?.trim()) throw new Error('The model returned an empty answer.');
-					app.Reply(fresh.text.trim());
+					app.Reply($this.ReadControl(fresh.text, false).reply);
 					return;
 				}
 
@@ -591,13 +604,15 @@ ${reports.map(JSON.stringify).join('\n')}
 Summarize these results and answer the user in natural language.
 `;
 			let response=await Flow.generate.text(`${prompt}. `, {systemInstruction: `
-依使用者的語言，以 App 回報的結果為依據回答。
+依使用者的語言，以 App 回報的結果為依據回答。整個答覆只輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，不要附加文字或 Markdown。
 `});
 			if (turn?.signal.aborted) return;
-			answer=response.text?.trim();
+			answer=$this.ReadControl(response.text, false).reply;
 		}
 
-		if (!answer) throw new Error('The model returned an empty answer me.');
+		if (!answer) {
+			answer=$this.ReadControl('', false).reply;
+		}
 		if (turn?.signal.aborted) return;
 
 		if (structured) {
@@ -631,11 +646,10 @@ Actual result: ${JSON.stringify(details)}
 Reply briefly to the user in the language of the current conversation.
 `;
 		let response=await Flow.generate.text(`${prompt}. `, {systemInstruction: `
-根據 App 回報的結果，依使用者當前對話語言簡短回覆。
+根據 App 回報的結果，依使用者當前對話語言簡短回覆。整個答覆只輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，不要附加文字或 Markdown。
 `});
 
-		if (!response.text?.trim()) throw new Error('The model returned an empty answer.');
-		this.Reply(response.text.trim(), image?{includedMedia: image}:{});
+		this.Reply(_(this).ReadControl(response.text, false).reply, image?{includedMedia: image}:{});
 	};
 
 	_['private'].m_state=null;
