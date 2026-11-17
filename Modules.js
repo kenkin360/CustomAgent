@@ -11,11 +11,13 @@ var Modules=Function.extend(Object, function () {
 	}
 
 	_['public'].GetSources=function () { return _(this).m_sources; };
+
 	_['public'].GetRuntime=function () {
 		let runtime=globalThis.AppRuntime||=Object.create(null);
 		runtime.Modules||=Object.create(null);
 		return runtime;
 	};
+
 	_['public'].GetNames=function () { return Object.keys(this.GetRuntime().Modules); };
 
 	_['public'].Initialize=function () {
@@ -33,6 +35,7 @@ var Modules=Function.extend(Object, function () {
 				return Helper.Error(error);
 			});
 		}
+
 		return $this.m_startup;
 	};
 
@@ -49,6 +52,7 @@ var Modules=Function.extend(Object, function () {
 				return Helper.Error(error);
 			}
 		}
+
 		this.GetRuntime().UI?.Unmount(name);
 		return null;
 	};
@@ -57,9 +61,11 @@ var Modules=Function.extend(Object, function () {
 		if ('string'!==typeof name||!/^[A-Za-z_$][\w$]*$/.test(name)) {
 			return Helper.Error('Provide a valid module name.');
 		}
+
 		if ('function'!==typeof Type) {
 			return Helper.Error('Provide a module class.');
 		}
+
 		let $this=_(this);
 		let runtime=this.GetRuntime().Modules;
 		let previous=runtime[name];
@@ -68,6 +74,7 @@ var Modules=Function.extend(Object, function () {
 		if (error) {
 			return error;
 		}
+
 		runtime[name]=Type;
 		$this.m_sources.SetInstalled(name, new Source(name, code, undefined, false));
 		$this.m_versions.push({Name: name, Previous: previous, PreviousSource: previousSource, Current: Type});
@@ -80,10 +87,12 @@ var Modules=Function.extend(Object, function () {
 		if (!installation) {
 			return Helper.Error('No module installation is available to undo.');
 		}
+
 		let error=await $this.Dispose(installation.Name, installation.Current);
 		if (error) {
 			return error;
 		}
+
 		let runtime=this.GetRuntime().Modules;
 		if (installation.Previous) {
 			runtime[installation.Name]=installation.Previous;
@@ -91,6 +100,7 @@ var Modules=Function.extend(Object, function () {
 		else {
 			delete runtime[installation.Name];
 		}
+
 		$this.m_sources.SetInstalled(installation.Name, installation.PreviousSource);
 		$this.m_versions.pop();
 		if ('function'===typeof installation.Previous?.Initialize) {
@@ -104,6 +114,7 @@ var Modules=Function.extend(Object, function () {
 				return Helper.Error(error);
 			}
 		}
+
 		return installation.Previous||null;
 	};
 
@@ -113,10 +124,12 @@ var Modules=Function.extend(Object, function () {
 		if (!Object.prototype.hasOwnProperty.call(runtime, name)) {
 			return Helper.Error('Module is not installed: '+name);
 		}
+
 		let error=await $this.Dispose(name, runtime[name]);
 		if (error) {
 			return error;
 		}
+
 		delete runtime[name];
 		$this.m_sources.SetInstalled(name, null);
 		$this.m_versions=$this.m_versions.filter((entry)=>entry.Name!==name);

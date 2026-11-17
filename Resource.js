@@ -9,6 +9,7 @@ var Resource=Function.extend(Promise, function () {
 			_['base'].call(this, name);
 			return;
 		}
+
 		let resolve;
 		let reject;
 		_['base'].call(this, (done, fail)=>{
@@ -42,6 +43,7 @@ var Resource=Function.extend(Promise, function () {
 			$this.Finish(new Error('External resources require a browser environment'));
 			return null;
 		}
+
 		state.LoadHandler=loadHandler;
 		state.ErrorHandler=$this.HandleError.bind($this);
 		state.TimeoutHandler=$this.HandleTimeout.bind($this);
@@ -50,21 +52,25 @@ var Resource=Function.extend(Promise, function () {
 			state.Interval=setInterval(loadHandler, 50);
 			loadHandler();
 		}
+
 		if ((state.Finished)||(state.Pending)) {
 			return null;
 		}
+
 		let id=state.Name+'-loader';
 		state.Element=document.getElementById(id);
 		if (state.Element) {
 			$this.Watch();
 			return state.Element;
 		}
+
 		state.Element=document.createElement(tagName);
 		state.Created=true;
 		state.Element.id=id;
 		if ('async' in state.Element) {
 			state.Element.async=true;
 		}
+
 		$this.Watch();
 		state.Element.src=state.Url;
 		if (append) {
@@ -75,6 +81,7 @@ var Resource=Function.extend(Promise, function () {
 				$this.Finish(error);
 			}
 		}
+
 		return state.Element;
 	};
 
@@ -101,6 +108,7 @@ var Resource=Function.extend(Promise, function () {
 		if (state.Finished) {
 			return;
 		}
+
 		state.Finished=true;
 		clearInterval(state.Interval);
 		clearTimeout(state.Timeout);
@@ -108,10 +116,12 @@ var Resource=Function.extend(Promise, function () {
 			state.Element.removeEventListener('load', state.LoadHandler);
 			state.Element.removeEventListener('error', state.ErrorHandler);
 		}
+
 		if (error) {
 			if ((state.Created)&&(state.Element)) {
 				state.Element.remove();
 			}
+
 			state.Reject(error);
 		}
 		else {
@@ -130,6 +140,7 @@ var Resource=Function.extend(Promise, function () {
 				_['base'].apply(this, arguments);
 				return;
 			}
+
 			_['base'].apply(this, arguments)(function () {
 				this.Start();
 			});
@@ -147,11 +158,13 @@ var Resource=Function.extend(Promise, function () {
 			if (state.Finished) {
 				return;
 			}
+
 			let value=state.Resolved||globalThis[state.Name];
 			if ((value)&&(typeof value.then==='function')) {
 				if (value===state.Pending) {
 					return;
 				}
+
 				state.Pending=value;
 				try {
 					state.Resolved=await value;
@@ -160,12 +173,15 @@ var Resource=Function.extend(Promise, function () {
 					$this.Finish(error);
 					return;
 				}
+
 				if (state.Pending===value) {
 					state.Pending=null;
 					await $this.Check();
 				}
+
 				return;
 			}
+
 			if ((value)&&((!state.ReadyMember)||(value[state.ReadyMember]))) {
 				globalThis[state.Name]=value;
 				$this.Finish(null, value);
@@ -184,6 +200,7 @@ var Resource=Function.extend(Promise, function () {
 				_['base'].apply(this, arguments);
 				return;
 			}
+
 			_['base'].apply(this, arguments)(function () {
 				this.Start();
 			});
@@ -204,10 +221,12 @@ var Resource=Function.extend(Promise, function () {
 			if (state.Finished) {
 				return;
 			}
+
 			try {
 				if (typeof state.Element.decode==='function') {
 					await state.Element.decode();
 				}
+
 				if (!state.Element.naturalWidth) {
 					return Helper.Error('Failed to decode external picture');
 				}
@@ -216,6 +235,7 @@ var Resource=Function.extend(Promise, function () {
 				$this.Finish(error);
 				return;
 			}
+
 			$this.Finish(null, state.Element);
 		};
 

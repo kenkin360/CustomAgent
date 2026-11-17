@@ -24,23 +24,26 @@ var CustomAgent=Function.extend(React.Component, function () {
 				_['base'].call(this, locale);
 				return;
 			}
+
 			let resolve;
 			_['base'].call(this, (done)=>{
 				resolve=done;
 			})(function () {
 				this.Locale=locale;
-				this.Entries=DisplayText.English;
+				this.Entries=DisplayText.Default?.Entries||this.Entries;
 				if ('en'===locale) {
 					resolve(this.Entries);
 					return;
 				}
-				Flow.generate.text(`Translate every value into the ${locale} locale. Preserve all keys. Return only a JSON object that JSON.parse can read directly.\n${JSON.stringify(DisplayText.English)}`).then((result)=>{
+
+				Flow.generate.text(`Translate every value into the ${locale} locale. Preserve all keys. Return only a JSON object that JSON.parse can read directly.\n${JSON.stringify(DisplayText.Default.Entries)}`).then((result)=>{
 					let entries=JSON.parse(result.text);
-					if (!entries||Object.keys(DisplayText.English).some((key)=>'string'!==typeof entries[key])) {
+					if (!entries||Object.keys(DisplayText.Default.Entries).some((key)=>'string'!==typeof entries[key])) {
 						Helper.Error('The translated text is incomplete.');
 						resolve(this.Entries);
 						return;
 					}
+
 					this.Entries=entries;
 					resolve(entries);
 				}).catch((error)=>{
@@ -50,7 +53,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			});
 		}
 
-		DisplayText.English={
+		_['public'].Entries={
 			tagline: 'Describe an edit to use local tools, or generate an image'
 			, help: 'Help'
 			, target: 'Target Media'
@@ -78,7 +81,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 		};
 		
 		_['public'].Locale=null;
-		_['public'].Entries=null;
 
 		DisplayText.GetInstance=function (locale) {
 			let instance=DisplayText.Instances.get(locale);
@@ -86,14 +88,16 @@ var CustomAgent=Function.extend(React.Component, function () {
 				instance=new DisplayText(locale);
 				DisplayText.Instances.set(locale, instance);
 			}
+
 			return instance;
 		};
 
 		DisplayText.GetText=function (locale, key) {
-			return (DisplayText.GetInstance(locale).Entries||DisplayText.English)[key]||key;
+			return (DisplayText.GetInstance(locale).Entries||DisplayText.Default.Entries)[key]||key;
 		};
 
-		DisplayText.Instances=new Map();
+		DisplayText.Default=new DisplayText('en');
+		DisplayText.Instances=new Map([['en', DisplayText.Default]]);
 	});
 
 	_['private'].SetValues=function (patch) {
@@ -104,13 +108,13 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['private'].AddMessage=function (sender, text, fields={}) {
 		let $this=_(this);
-		$this.SetValues({messages: [...$this.m_state.Messages, {
+		$this.SetValues({messages: [...$this.m_state.Messages, new Message({
 			id: `${sender}_${Date.now()}_${Math.random()}`
 			, sender
 			, text
 			, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
 			, ...fields
-		}]});
+		})]});
 	};
 
 	_['public'].Slots=['header', 'canvas', 'chat', 'overlay'];
@@ -121,21 +125,18 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].GetState=function () {
-		return _(this).m_state.ToSnapshot();
-	};
-
-	_['private'].ToLegacyMedia=async function (media) {
-		if (!media) { return null; }
-		let state=this.m_state;
-		return {...media.toJSON(), base64: media.Data?await media.ToBase64():undefined, mediaId: state.MediaIds.get(media.Id), title: state.Labels.get(media.Id)};
+		return _(this).m_state;
 	};
 
 	_['public'].GetImageInfo=async function () {
 		let $this=_(this);
 		let image=$this.m_state.ActiveMedia;
 		if (!(image instanceof Media.Image)) { return null; }
-		let dimensions=image.Width&&image.Height?{width: image.Width, height: image.Height}:await new ImageService().GetDimensions(await $this.ToLegacyMedia(image));
-		return {...dimensions, mimeType: image.MimeType, title: $this.m_state.Labels.get(image.Id)};
+
+		let dimensions=await new ImageService().GetDimensions(image);
+		if (dimensions instanceof Error) { return dimensions; }
+
+		return {...dimensions, mimeType: image.MimeType, title: image.Title};
 	};
 
 	_['public'].Reply=function (text, fields={}) {
@@ -152,7 +153,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].Mount=function (name, element, slot='header') { _(this).m_view.Mount(name, element, slot, this.Slots); };
+
 	_['public'].Unmount=function (name) { _(this).m_view.Unmount(name); };
+
 	_['public'].Mounted=function () { return _(this).m_view.Mounted(); };
 
 	_['public'].Subscribe=function (listener) {
@@ -170,27 +173,36 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].UpdateConversation=function (patch) { _(this).SetValues(patch); };
+
 	_['public'].ResetConversation=function () {
 		let $this=_(this);
 		if ($this.m_state.IsGenerating) { return Helper.Error('Wait for image generation to finish before resetting the conversation.'); }
+
 		$this.SetValues({messages: [], accumulatedChanges: [], generationPrompt: '', inputText: ''});
 	};
+
 	_['public'].SetInput=function (value) { this.UpdateConversation({inputText: value}); };
+
 	_['public'].SetRatio=function (value) {
 		if (!['original', '1:1', '16:9', '9:16', '4:3', '3:4'].includes(value)) { return Helper.Error('Unsupported aspect ratio.'); }
+
 		this.UpdateConversation({selectedRatio: value});
 	};
+
 	_['public'].SelectVersion=function (id) {
 		let $this=_(this);
 		let media=$this.m_state.History.find((item)=>item.Id===id);
 		if (!media) { return Helper.Error('Media version not found: '+id); }
+
 		$this.SetValues({activeMedia: media, currentMedia: media});
 	};
+
 	_['public'].Stop=function () {
 		let $this=_(this);
 		if (!$this.m_activeTurn) {
 			return;
 		}
+
 		$this.m_activeTurn.abort();
 		$this.m_activeTurn=null;
 		$this.SetValues({isConsulting: false});
@@ -199,9 +211,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].GenerateVideo=async function (args={}, context={}) {
 		let image=context.image;
 		if ((args.useCurrentImageAsFirstFrame||args.useCurrentImageAsReference)&&!image) { return Helper.Error('No current image is available.'); }
+
 		if (args.useCurrentImageAsFirstFrame&&args.firstFrameImageMediaId) { return Helper.Error('Choose one first-frame image.'); }
+
 		let references=args.referenceImageMediaIds||[];
 		if (!Array.isArray(references)) { return Helper.Error('Reference image media IDs must be an array.'); }
+
 		let artifact=await new VideoService().Generate({
 			prompt: args.prompt
 			, aspectRatio: args.aspectRatio
@@ -211,10 +226,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 			, referenceImages: args.useCurrentImageAsReference?[image, ...references]:references
 			, sourceVideoMediaId: args.sourceVideoMediaId
 		});
+
 		if (artifact instanceof Error) {
 			return artifact;
 		}
-		return {message: `Video generated and saved to Flow Assets (${artifact.mediaId}).`, artifact};
+
+		return {message: `Video generated and saved to Flow Assets (${artifact.MediaId}).`, artifact};
 	};
 
 	_['public'].componentDidMount=function () {
@@ -243,14 +260,17 @@ var CustomAgent=Function.extend(React.Component, function () {
 				button.onclick=callback;
 			}
 		}
+
 		for (let button of root.querySelectorAll('[data-ratio]')) {
 			button.onclick=()=>$this.SetRatio(button.dataset.ratio);
 		}
+
 		root.oninput=(event)=>{
 			if (event.target===$this.m_view.Node('input')) {
 				$this.m_state.InputText=event.target.value;
 			}
 		};
+
 		root.onkeydown=(event)=>{
 			if (event.target===$this.m_view.Node('input')&&'Enter'===event.key&&!event.shiftKey&&!event.isComposing) {
 				event.preventDefault();
@@ -259,6 +279,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 				}
 			}
 		};
+
 		if ('function'===typeof globalThis.addEventListener) {
 			$this.m_errorEvents=new AbortController();
 			let capture=(event, error)=>{
@@ -266,12 +287,15 @@ var CustomAgent=Function.extend(React.Component, function () {
 				if (!stack.includes('CustomAgentGenerated.js')) {
 					return;
 				}
+
 				event.preventDefault();
 				$this.ReportError(error||new Error(event.message||'Generated code failed.'));
 			};
+
 			globalThis.addEventListener('error', (event)=>capture(event, event.error), {signal: $this.m_errorEvents.signal});
 			globalThis.addEventListener('unhandledrejection', (event)=>capture(event, event.reason), {signal: $this.m_errorEvents.signal});
 		}
+
 		$this.m_ready=$this.Welcome().catch((error)=>{
 			$this.m_view.Node('app').style.visibility='visible';
 			$this.ReportError(error);
@@ -284,6 +308,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (!message||$this.m_state.IsConsulting) {
 			return;
 		}
+
 		let turn=new AbortController();
 		$this.m_activeTurn=turn;
 		$this.AddMessage('user', message);
@@ -308,11 +333,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		try {
 			let image=await new ImageService().Select();
+			if (image instanceof Error) { $this.ReportError(image); return; }
+
 			if (!image) {
 				return;
 			}
+
 			$this.SetValues({activeMedia: image, currentMedia: image, history: [image, ...$this.m_state.History]});
-			await this.NotifyAssistant('Media selected', {Title: image.title, Width: image.width, Height: image.height}, image);
+			await this.NotifyAssistant('Media selected', {Title: image.Title, Width: image.Width, Height: image.Height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
@@ -321,11 +349,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		try {
 			let image=await new ImageService().Capture();
+			if (image instanceof Error) { $this.ReportError(image); return; }
+
 			if (!image) {
 				return;
 			}
+
 			$this.SetValues({activeMedia: image, currentMedia: image, history: [image, ...$this.m_state.History]});
-			await this.NotifyAssistant('Camera image captured', {Title: image.title, Width: image.width, Height: image.height}, image);
+			await this.NotifyAssistant('Camera image captured', {Title: image.Title, Width: image.Width, Height: image.Height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 	};
@@ -337,12 +368,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (!text||state.IsGenerating) {
 			return;
 		}
+
 		$this.SetValues({isGenerating: true});
 		try {
-			let generated=await new ImageService().Generate(text, state.ActiveMedia instanceof Media.Image?await $this.ToLegacyMedia(state.ActiveMedia):null, state.SelectedRatio, state.History.length+1);
-			let image=generated.Image;
+			let image=await new ImageService().Generate(text, state.ActiveMedia instanceof Media.Image?state.ActiveMedia:null, state.SelectedRatio, state.History.length+1);
+			if (image instanceof Error) { $this.ReportError(image); return; }
+
 			$this.SetValues({activeMedia: image, currentMedia: image, history: [image, ...state.History]});
-			await this.NotifyAssistant('Image generation completed', {Title: image.title, Prompt: text, Width: image.width, Height: image.height}, image);
+			await this.NotifyAssistant('Image generation completed', {Title: image.Title, Prompt: text, Width: image.Width, Height: image.Height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
 		finally { $this.SetValues({isGenerating: false}); }
@@ -353,10 +386,10 @@ var CustomAgent=Function.extend(React.Component, function () {
 		try {
 			let media=$this.m_state.ActiveMedia;
 			if (media instanceof Media.Video) {
-				await new VideoService().Download(await $this.ToLegacyMedia(media));
+				await new VideoService().Download(media);
 			}
 			else if (media instanceof Media.Image) {
-				await new ImageService().Download(await $this.ToLegacyMedia(media));
+				await new ImageService().Download(media);
 			}
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -370,10 +403,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 		if (root) {
 			root.oninput=root.onkeydown=null;
 		}
+
 		let runtime=$this.m_modules.GetRuntime();
 		if (runtime.UI===this) {
 			delete runtime.UI;
 		}
+
 		for (let name of this.Mounted()) this.Unmount(name);
 		$this.m_view.Dispose();
 		$this.m_listeners.clear();
@@ -394,9 +429,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 			$this.ReportError(startup);
 			return;
 		}
+
 		if ($this.m_state.Messages.length) {
 			return;
 		}
+
 		let reply=await $this.InvokeText(`Welcome the user briefly. Browser locale: ${locale}. Available modules: ${$this.m_modules.GetNames().join(', ')}.`, {systemInstruction: $this.Instruction()});
 		if (reply instanceof Error) {
 			$this.ReportError(reply);
@@ -410,7 +447,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return `You are the assistant inside CustomAgent. Return only a JavaScript async function body, without Markdown fences or JSON packaging. Your code must return a plain string in the language of the current user conversation. For a text-only answer, return a string directly.
 The body receives "modules". Available members:
 - modules.Runtime: installed classes by name. Call their static Run methods directly and await them.
-- modules.Context: the current {image, artifact} for existing media modules.
+- modules.Context: the actual {image, artifact} Media instances. Inspect their types and members directly.
 - await modules.Apply(result): display an image or video produced by a module and add it to media history.
 - await modules.Install(name, Type): install a class defined in this function body. A class may define static Dispose() to release listeners, timers, and other resources. UI mounted under its module name is removed automatically. Classes with resources that must be restored after rollback should also define static Initialize(); call it after the initial installation.
 - await modules.Rollback(): undo the latest installation. await modules.Uninstall(name): remove a module and its installed source.
@@ -424,10 +461,12 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 		if (result instanceof Error) {
 			return result;
 		}
+
 		let value=result?.artifact||result?.image||result;
-		if (!(value instanceof Media)&&!value?.mimeType) {
+		if (!(value instanceof Media)&&!value?.mimeType&&!value?.MimeType) {
 			return result;
 		}
+
 		if (!(value instanceof Media)&&!value.data&&!value.base64&&value.mediaId) {
 			try {
 				value={...value, ...await Flow.media.getBase64({mediaId: value.mediaId})};
@@ -436,23 +475,23 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 				return Helper.Error(error);
 			}
 		}
-		if (!(value instanceof Media)&&!value.data&&!value.base64) {
-			return Helper.Error('Media content is unavailable.');
-		}
-		if (!(value instanceof Media)&&/^image\//.test(value.mimeType)&&value.base64) {
-			let image=this.m_state.ActiveMedia instanceof Media.Image?await this.ToLegacyMedia(this.m_state.ActiveMedia):null;
-			value=await new ImageService().ReadActionResult(value, image, 'Local module');
-		}
-		let media=this.m_state.AsMedia(value);
+
+		let media=Media.From(value);
 		if (media instanceof Error) {
 			return media;
 		}
+
+		if (!media.Data) {
+			return Helper.Error('Media content is unavailable.');
+		}
+
 		if (media instanceof Media.Image||media instanceof Media.Video) {
-			this.SetValues({activeMedia: value, currentMedia: value, history: [value, ...this.m_state.History]});
+			this.SetValues({activeMedia: media, currentMedia: media, history: [media, ...this.m_state.History]});
 		}
 		else {
-			this.SetValues({currentMedia: value});
+			this.SetValues({currentMedia: media});
 		}
+
 		return result;
 	};
 
@@ -465,9 +504,11 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 		catch (error) {
 			return Helper.Error(error);
 		}
+
 		if (turn?.signal.aborted) {
 			return null;
 		}
+
 		let code=response?.text;
 		let execution={Code: code, Reply: null, Error: null, Changes: []};
 		$this.m_executions.push(execution);
@@ -481,14 +522,15 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 				execution.Changes.push({Operation: description, Result: failure.message});
 				return failure;
 			});
+
 			pending.push(task);
 			return task;
 		};
-		let image=$this.m_state.ActiveMedia instanceof Media.Image?await $this.ToLegacyMedia($this.m_state.ActiveMedia):null;
-		let artifact=$this.m_state.CurrentMedia===$this.m_state.ActiveMedia&&image?image:await $this.ToLegacyMedia($this.m_state.CurrentMedia);
+
+		let image=$this.m_state.ActiveMedia instanceof Media.Image?$this.m_state.ActiveMedia:null;
 		let modules={
 			Runtime: $this.m_modules.GetRuntime().Modules
-			, Context: {image, artifact}
+			, Context: {image, artifact: $this.m_state.CurrentMedia}
 			, Sources: $this.m_modules.GetSources()
 			, Executions: $this.m_executions
 			, UI: $this.m_modules.GetRuntime().UI
@@ -497,6 +539,7 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 			, Uninstall: (name)=>track($this.m_modules.Uninstall(name), `Uninstall ${name}`)
 			, Apply: (value)=>track($this.ApplyResult(value), 'Apply media')
 		};
+
 		try {
 			let AsyncFunction=(async function () {}).constructor;
 			let Run=new AsyncFunction('modules', code+'\n//# sourceURL=CustomAgentGenerated.js');
@@ -505,14 +548,17 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 		catch (error) {
 			execution.Error=error instanceof Error?error:Helper.Error(error);
 		}
+
 		let results=await Promise.all(pending);
 		execution.Error||=results.find((value)=>value instanceof Error)||null;
 		if (execution.Reply instanceof Error) {
 			execution.Error||=execution.Reply;
 		}
+
 		if (!execution.Error&&'string'!==typeof execution.Reply) {
 			execution.Error=Helper.Error('Generated code must return a string.');
 		}
+
 		return execution.Error||execution.Reply;
 	};
 
@@ -522,52 +568,46 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 		if (turn.signal.aborted) {
 			return;
 		}
+
 		let state=$this.GetState();
-		let history=state.messages.slice(-20).map((entry)=>`${entry.sender}: ${entry.text}`).join('\n\n');
+		let history=state.Messages.slice(-20).map((entry)=>`${entry.Sender}: ${entry.Text}`).join('\n\n');
 		let image=await $this.GetImageInfo();
+		if (image instanceof Error) { $this.ReportError(image); return; }
+
 		let available=Object.entries($this.m_modules.GetRuntime().Modules).map(([name, Type])=>`${name}: ${Type.Run?.Description||'no description'}`).join('\n');
-		let prompt=`Installed modules:\n${available||'(none)'}\nCompiled source files: ${JSON.stringify($this.m_modules.GetSources().CompiledNames())}\nCurrent image: ${JSON.stringify(image)}\nCurrent media: ${JSON.stringify($this.DescribeMedia($this.m_state.CurrentMedia))}\nSelected ratio: ${state.selectedRatio}\nConfirmed changes: ${JSON.stringify(state.accumulatedChanges)}\nPrevious conversation:\n${history}\nCurrent user message:\n${message}`;
+		let media=$this.m_state.CurrentMedia;
+		let prompt=`Installed modules:\n${available||'(none)'}\nCompiled source files: ${JSON.stringify($this.m_modules.GetSources().CompiledNames())}\nCurrent image: ${JSON.stringify(image)}\nCurrent media type: ${media?.constructor.name||'none'}; fields: ${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}. Access the instance through modules.Context.artifact.\nSelected ratio: ${state.SelectedRatio}\nConfirmed changes: ${JSON.stringify(state.AccumulatedChanges)}\nPrevious conversation:\n${history}\nCurrent user message:\n${message}`;
 		let options={systemInstruction: $this.Instruction()};
 		if (image) {
-			let media=await $this.ToLegacyMedia($this.m_state.ActiveMedia);
-			options.images=[{base64: media.base64, mimeType: media.mimeType}];
+			let current=$this.m_state.ActiveMedia;
+			options.images=[{base64: await current.ToBase64(), mimeType: current.MimeType}];
 		}
+
 		for (let attempt=0; attempt<3; attempt++) {
 			let reply=await $this.InvokeText(prompt, options, turn);
 			if (turn.signal.aborted) {
 				return;
 			}
+
 			if (!(reply instanceof Error)) {
 				$this.Reply(reply, {includedMedia: $this.m_state.CurrentMedia});
 				return;
 			}
+
 			let previous=$this.m_executions.at(-1);
-			prompt+=`\nThe previous program failed. Its source was:\n${previous?.Code||''}\nActual completed operations: ${JSON.stringify(previous?.Changes||[])}\nError: ${reply.message}\nInstalled modules now: ${$this.m_modules.GetNames().join(', ')}\nCurrent media now: ${JSON.stringify($this.DescribeMedia($this.m_state.CurrentMedia))}\nWrite a corrected program. Continue from actual state; do not repeat successful side effects.`;
+			media=$this.m_state.CurrentMedia;
+			prompt+=`\nThe previous program failed. Its source was:\n${previous?.Code||''}\nActual completed operations: ${JSON.stringify(previous?.Changes||[])}\nError: ${reply.message}\nInstalled modules now: ${$this.m_modules.GetNames().join(', ')}\nCurrent media now: ${media?.constructor.name||'none'}; fields: ${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}. Access the instance through modules.Context.artifact.\nWrite a corrected program. Continue from actual state; do not repeat successful side effects.`;
 			if (attempt===2) {
 				$this.ReportError(reply);
 			}
 		}
 	};
 
-	_['private'].DescribeMedia=function (media) {
-		if (!media) { return null; }
-		let state=this.m_state;
-		return {
-			type: media instanceof Media.Image?'image':media instanceof Media.Video?'video':'media'
-			, id: media.Id
-			, title: state.Labels.get(media.Id)
-			, mimeType: media.MimeType
-			, mediaId: state.MediaIds.get(media.Id)
-			, ...(media instanceof Media.Image?{width: media.Width, height: media.Height}:{})
-			, ...(media instanceof Media.Video?{durationSeconds: media.DurationSeconds, resolution: media.Resolution}:{})
-		};
-	};
-
 	_['private'].Report=async function (event, details={}, image) {
 		await _(this).m_ready;
 
-		let messages=this.GetState().messages.slice(-8)
-			.map((entry)=>`${entry.sender}: ${entry.text}`)
+		let messages=this.GetState().Messages.slice(-8)
+			.map((entry)=>`${entry.Sender}: ${entry.Text}`)
 			.join('\n');
 
 		let prompt=`
@@ -582,6 +622,7 @@ Reply briefly to the user in the language of the current conversation.
 			this.ReportError(reply);
 			return;
 		}
+
 		this.Reply(reply, image?{includedMedia: image}:{});
 	};
 

@@ -28,6 +28,7 @@ var Bundle=Function.extend(Function, function () {
 				return error instanceof Error?error:new Error(String(error));
 			}
 		}
+
 		return loaded;
 	};
 

@@ -14,6 +14,7 @@ var Upscale=Function.extend(Object, function () {
 		if (!$this.m_websr) {
 			$this.m_websr=new Resource.Module('WebSR', 'https://esm.sh/gh/sb2702/websr/dist/websr.js?raw');
 		}
+
 		try { return await $this.m_websr; }
 		catch (error) { $this.m_websr=null; return Helper.Error(error); }
 	};
@@ -23,37 +24,51 @@ var Upscale=Function.extend(Object, function () {
 		if (!$this.m_weights) {
 			$this.m_weights=fetch('https://esm.sh/gh/sb2702/websr@v0.1.0/weights/realesrgan/x4v3.bin?raw').then(async function(response) {
 				if (!response.ok) { return Helper.Error('Failed to load weights: '+response.status); }
+
 				return response.arrayBuffer();
 			});
 		}
+
 		try { return await $this.m_weights; }
 		catch (error) { $this.m_weights=null; return Helper.Error(error); }
 	};
 
 	_['public'].Run=async function (args={}, {image}) {
-		if (!image) { return Helper.Error('Load an image first.'); }
+		if (!(image instanceof Media.Image)||!image.Data) { return Helper.Error('Load an image first.'); }
+
 		let width=args.width;
 		let height=args.height;
 		if ((width!==undefined||height!==undefined)&&(!Number.isSafeInteger(width)||width<1||!Number.isSafeInteger(height)||height<1)) {
 			return Helper.Error('Provide positive integer width and height in pixels.');
 		}
+
 		let WebSR=await _(this).GetWebSR();
 		if (WebSR instanceof Error) {
 			return WebSR;
 		}
+
 		let source=new Image();
-		source.src='data:'+image.mimeType+';base64,'+image.base64;
-		await source.decode();
+		let url=URL.createObjectURL(image.Data);
+		try {
+			source.src=url;
+			await source.decode();
+		}
+		finally {
+			URL.revokeObjectURL(url);
+		}
+
 		let buffer=await _(this).GetWeights();
 		if (buffer instanceof Error) {
 			return buffer;
 		}
+
 		let canvas=document.createElement('canvas');
 		let upscaler;
 		let webgl=false;
 		let gpu=false;
 		try { gpu=await WebSR.initWebGPU(); }
 		catch (error) { gpu=false; }
+
 		if (gpu) {
 			upscaler=new WebSR({
 				network_name: 'realesrgan/x4v3'
@@ -68,6 +83,7 @@ var Upscale=Function.extend(Object, function () {
 			if (!gl||!WebSRWebGL.supportsNetwork('realesrgan/x4v3', gl)) {
 				return Helper.Error('Real-ESRGAN requires WebGPU or a capable WebGL2 device.');
 			}
+
 			webgl=true;
 			upscaler=new WebSRWebGL({
 				network_name: 'realesrgan/x4v3'
@@ -76,6 +92,7 @@ var Upscale=Function.extend(Object, function () {
 				, canvas
 			});
 		}
+
 		try {
 			await upscaler.render(source);
 			let output=document.createElement('canvas');
@@ -83,6 +100,7 @@ var Upscale=Function.extend(Object, function () {
 			output.height=canvas.height;
 			let context=output.getContext('2d');
 			if (!context) { return Helper.Error('Output canvas is unavailable.'); }
+
 			if (webgl) {
 				let pixels=upscaler.readPixels();
 				let result=context.createImageData(output.width, output.height);
@@ -90,6 +108,7 @@ var Upscale=Function.extend(Object, function () {
 				for (let y=0; y<output.height; y++) {
 					result.data.set(pixels.subarray(y*row, (y+1)*row), (output.height-1-y)*row);
 				}
+
 				context.putImageData(result, 0, 0);
 			}
 			else context.drawImage(canvas, 0, 0);
@@ -99,6 +118,7 @@ var Upscale=Function.extend(Object, function () {
 				fitted.height=height;
 				let surface=fitted.getContext('2d');
 				if (!surface) { return Helper.Error('Target canvas is unavailable.'); }
+
 				let scale=Math.min(width/output.width, height/output.height);
 				let drawWidth=output.width*scale;
 				let drawHeight=output.height*scale;
@@ -106,13 +126,16 @@ var Upscale=Function.extend(Object, function () {
 				surface.drawImage(output, (width-drawWidth)/2, (height-drawHeight)/2, drawWidth, drawHeight);
 				output=fitted;
 			}
+
 			return {
 				message: 'Upscaled to '+output.width+' × '+output.height+' with Real-ESRGAN.'
-				, image: {
+				, image: new Media.Image({
 					base64: output.toDataURL('image/png').split(',')[1]
 					, mimeType: 'image/png'
-					, title: image.title+' · '+output.width+'×'+output.height
-				}
+					, width: output.width
+					, height: output.height
+					, title: image.Title+' · '+output.width+'×'+output.height
+				})
 			};
 		}
 		finally { upscaler.destroy(); }

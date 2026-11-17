@@ -13,62 +13,38 @@ var AgentState=Function.extend(Object, function () {
 		this.Messages=[];
 		this.InputText='';
 		this.IsConsulting=false;
-		this.Labels=new Map();
-		this.MediaIds=new Map();
-		this.Files=new WeakMap();
-	}
-	_['public'].Remember=function (media, value) {
-		if (!media||!value) { return; }
-		if (value.title) { this.Labels.set(media.Id, value.title); }
-		if (value.mediaId) { this.MediaIds.set(media.Id, value.mediaId); }
 	};
-	_['public'].AsMedia=function (value) {
-		if (!value||value instanceof Media) { return value; }
-		let file=this.Files.get(value);
-		if (!file) {
-			file=Media.From(value);
-			this.Files.set(value, file);
-		}
-		return file;
-	};
+
 	_['public'].Apply=function (patch) {
 		if ('activeMedia' in patch) {
-			this.ActiveMedia=patch.activeMedia?this.AsMedia(patch.activeMedia):null;
-			this.Remember(this.ActiveMedia, patch.activeMedia);
+			this.ActiveMedia=patch.activeMedia;
 		}
+
 		if ('currentMedia' in patch) {
-			this.CurrentMedia=this.AsMedia(patch.currentMedia);
-			this.Remember(this.CurrentMedia, patch.currentMedia);
+			this.CurrentMedia=patch.currentMedia;
 		}
+
 		if ('history' in patch) {
-			this.History=patch.history.map((item)=>this.AsMedia(item));
-			for (let i=0; i<this.History.length; i++) this.Remember(this.History[i], patch.history[i]);
+			this.History=patch.history;
 		}
+
 		if ('isGenerating' in patch) { this.IsGenerating=patch.isGenerating; }
+
 		if ('selectedRatio' in patch) { this.SelectedRatio=patch.selectedRatio; }
+
 		if ('accumulatedChanges' in patch) { this.AccumulatedChanges=patch.accumulatedChanges.filter((item)=>'string'===typeof item); }
+
 		if ('generationPrompt' in patch) { this.GenerationPrompt=patch.generationPrompt; }
+
 		if ('messages' in patch) {
-			this.Messages=patch.messages.map((entry)=>entry instanceof Message?entry:new Message({...entry, includedMedia: this.AsMedia(entry.includedMedia)}));
+			this.Messages=patch.messages;
 		}
+
 		if ('inputText' in patch) { this.InputText=patch.inputText; }
+
 		if ('isConsulting' in patch) { this.IsConsulting=patch.isConsulting; }
 	};
-	_['public'].ToSnapshot=function () {
-		let describe=(media)=>media?{...media.toJSON(), data: media.Data, title: this.Labels.get(media.Id), mediaId: this.MediaIds.get(media.Id)}:null;
-		return {
-			activeMedia: describe(this.ActiveMedia)
-			, currentMedia: describe(this.CurrentMedia)
-			, history: this.History.map(describe)
-			, isGenerating: this.IsGenerating
-			, selectedRatio: this.SelectedRatio
-			, accumulatedChanges: this.AccumulatedChanges.slice()
-			, generationPrompt: this.GenerationPrompt
-			, messages: this.Messages.map((message)=>message.toJSON())
-			, inputText: this.InputText
-			, isConsulting: this.IsConsulting
-		};
-	};
+
 	_['public'].ActiveMedia=null;
 	_['public'].CurrentMedia=null;
 	_['public'].History=null;
@@ -79,7 +55,4 @@ var AgentState=Function.extend(Object, function () {
 	_['public'].Messages=null;
 	_['public'].InputText=null;
 	_['public'].IsConsulting=null;
-	_['public'].Labels=null;
-	_['public'].MediaIds=null;
-	_['public'].Files=null;
 });
