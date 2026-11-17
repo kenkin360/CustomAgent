@@ -37,15 +37,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 				}
 
 				Flow.generate.text(`Translate every value into the ${locale} locale. Preserve all keys. Return only a JSON object that JSON.parse can read directly.\n${JSON.stringify(DisplayText.Default.Entries)}`).then((result)=>{
-					let entries=JSON.parse(result.text);
-					if (!entries||Object.keys(DisplayText.Default.Entries).some((key)=>'string'!==typeof entries[key])) {
-						Helper.Error('The translated text is incomplete.');
-						resolve(this.Entries);
-						return;
-					}
-
-					this.Entries=entries;
-					resolve(entries);
+					this.Entries=JSON.parse(result.text);
+					resolve(this.Entries);
 				}).catch((error)=>{
 					Helper.Error(error);
 					resolve(this.Entries);
@@ -83,21 +76,21 @@ var CustomAgent=Function.extend(React.Component, function () {
 		_['public'].Locale=null;
 
 		DisplayText.GetInstance=function (locale) {
-			let instance=DisplayText.Instances.get(locale);
+			let instance=DisplayText.Instances.find((value)=>value.Locale===locale);
 			if (!instance) {
 				instance=new DisplayText(locale);
-				DisplayText.Instances.set(locale, instance);
+				DisplayText.Instances.push(instance);
 			}
 
 			return instance;
 		};
 
 		DisplayText.GetText=function (locale, key) {
-			return (DisplayText.GetInstance(locale).Entries||DisplayText.Default.Entries)[key]||key;
+			return DisplayText.GetInstance(locale).Entries?.[key]??DisplayText.Default.Entries[key]??key;
 		};
 
 		DisplayText.Default=new DisplayText('en');
-		DisplayText.Instances=new Map([['en', DisplayText.Default]]);
+		DisplayText.Instances=[DisplayText.Default];
 	});
 
 	_['private'].SetValues=function (patch) {
