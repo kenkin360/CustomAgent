@@ -12,11 +12,82 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_ready=null;
 		$this.m_modules=new Modules(new Sources(props.SourceFiles, props.HostSourceUrl));
 	}
+	
+	var DisplayText=Function.extend(Object, function () {
+		var _=this(DisplayText);
+		DisplayText=_[DisplayText];
+		
+		function DisplayText(locale) {
+			_['base'].apply(this, arguments);
+			
+			if(DisplayText.GetInstance(locale)){
+				return;
+			}
+			
+			try {
+				if('English'!=locale) {
+					var jsonText=Flow.generate.text(`
+請保持以下此字典 keys 並將各 value 翻譯為 ${locale} 語系
+並原樣傳回可被 JSON.parse 不經處理直接解析之 JSON 文字
+${JSON.stringify(this['Entries'])}
+`, {});
+					this['Entries']=JSON.parse(jsonText);
+				}
 
+				(DisplayText.Instances).push(this);
+				this['Locale']=locale;
+			}
+			catch(e) {
+				return Helper.Error(e);
+			}
+		};
+
+		_['public'].Entries={
+			tagline: 'Describe an edit to use local tools, or generate an image'
+			, help: 'Help'
+			, target: 'Target Media'
+			, download: 'Download'
+			, empty: 'No media selected. Load an image or describe an idea in chat.'
+			, media: '＋ Media'
+			, camera: 'Camera'
+			, generating: 'Generating image…'
+			, history: 'Media versions'
+			, copyPrompt: 'Copy prompt'
+			, generate: 'Generate image from confirmed changes'
+			, ratio: 'Output ratio'
+			, original: 'Original'
+			, input: 'Discuss an idea, draw a rectangle, inspect code, or create a local tool…'
+			, send: 'Send'
+			, stop: 'Stop'
+			, about: "Discuss image changes or ask for local operations. Only the Generate button creates a new image. You can also inspect and extend this session's code."
+			, close: 'Close'
+			, confirmedChanges: 'Confirmed changes'
+			, you: 'You'
+			, agent: 'Assistant'
+			, promptDraft: 'Combined prompt draft: '
+			, copy: 'Copy'
+			, thinking: 'Thinking and running local operations…'
+		};
+		
+		_['public'].Locale=null;
+		
+		DisplayText.GetInstance=function(locale){
+			return DisplayText.Instances(x => locale===x['Locale']);
+		};
+		
+		DisplayText.GetText=function(locale, key){
+			return ((DisplayText.GetInstance(locale)??DisplayText.Default)['Entries'])[key];
+		};
+
+		DisplayText.Instances=[];
+		DisplayText.Default=new DisplayText('English');
+	});	
+	
+/*
 	_['private'].Node=function (role) {
 		return this.m_view.Node(role);
 	};
-
+*/
 	_['private'].SetValues=function (patch) {
 		this.m_state.Apply(patch);
 		this.Update();
@@ -35,13 +106,25 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].Slots=['header', 'canvas', 'chat', 'overlay'];
-	CustomAgent.ActionNames=['readCompiledSource', 'readRemoteSource', 'readInstalledSource', 'inspectRuntime', 'loadModule', 'rollback', 'resetConversation', 'generateVideo'];
+//	CustomAgent.ActionNames=['readCompiledSource', 'readRemoteSource', 'readInstalledSource', 'inspectRuntime', 'loadModule', 'rollback', 'resetConversation', 'generateVideo'];
+
+/*
 	_['public'].Text=function (key) {
 		let english={tagline: 'Describe an edit to use local tools, or generate an image', help: 'Help', target: 'Target Media', download: 'Download', empty: 'No media selected. Load an image or describe an idea in chat.', media: '＋ Media', camera: 'Camera', generating: 'Generating image…', history: 'Media versions', copyPrompt: 'Copy prompt', generate: 'Generate image from confirmed changes', ratio: 'Output ratio', original: 'Original', input: 'Discuss an idea, draw a rectangle, inspect code, or create a local tool…', send: 'Send', stop: 'Stop', about: "Discuss image changes or ask for local operations. Only the Generate button creates a new image. You can also inspect and extend this session's code.", close: 'Close', confirmedChanges: 'Confirmed changes', you: 'You', agent: 'Assistant', promptDraft: 'Combined prompt draft: ', copy: 'Copy', thinking: 'Thinking and running local operations…'};
 		let chinese={tagline: '描述修改即可執行本地操作，也可選擇生成影像', help: '使用說明', target: '目前媒體 (Target Media)', download: '下載', empty: '尚未選擇媒體。請載入圖片，或在對話中描述構想。', media: '＋ 媒體庫', camera: '拍照', generating: 'AI 正在修訂影像…', history: '媒體版本', copyPrompt: '複製提示詞', generate: '依已確認改動生成影像', ratio: '輸出比例', original: '原圖', input: '討論構想、畫矩形、查看程式碼，或編寫本地功能…', send: '傳送', stop: '停止', about: '可討論影像修改或要求本地操作。只有按下生成按鈕才會產生新影像，也可以要求查閱及擴充本次執行的程式碼。', close: '關閉', confirmedChanges: '已確認的改動項目', you: '您', agent: 'AI 助理 (Agent)', promptDraft: '整合提示詞草稿：', copy: '複製', thinking: '正在理解要求並處理本地操作…'};
 		return ('zh'===_(this).m_view.GetLocale()?chinese:english)[key]||english[key]||key;
 	};
-	_['public'].Localize=function () { _(this).m_view.Localize((key)=>this.Text(key)); };
+
+	_['public'].Localize=function () { _(this).m_view.Localize((key)=>this.Text(key)); };	
+*/
+
+	_['private'].Update=function () {
+		let locale=_(this).m_view.GetLocale();
+		
+		this.m_view.Update(this.m_state, key => {
+			return DisplayText.GetText(locale, key);
+		}, (id)=>this.SelectVersion(id));
+	};
 
 	_['public'].GetState=function () {
 		return _(this).m_state.ToSnapshot();
@@ -117,7 +200,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_activeTurn=null;
 		$this.SetValues({isConsulting: false});
 	};
+
 	_['public'].PickMedia=function () { return this.SelectMedia(); };
+
 	_['public'].RunAction=async function (action, track=true, source, Type) {
 		let $this=_(this);
 		await $this.m_modules.GetStartup();
@@ -154,8 +239,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return {message: `Video generated and saved to Flow Assets (${artifact.mediaId}).`, artifact};
 	};
 
+	_['public'].HasVersion=function () { return _(this).m_modules.HasVersion(); };
+	_['public'].Initialize=function () { return _(this).m_modules.Initialize(); };
+
 	_['public'].InspectRuntime=function (args={}) {
-		let runtime=this.GetRuntime();
+		let runtime=(_(this).m_modules).GetRuntime();
+
 		if ('string'===typeof args.name) {
 			let fn=runtime.Modules[args.name]?.Run;
 			if ('function'!==typeof fn) return Helper.Error('Runtime function not found: '+args.name);
@@ -164,12 +253,10 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let modules=_(this).m_modules;
 		return {message: `Callable modules: ${this.GetNames().map((name)=>name+(runtime.Modules[name].Run.Description?': '+runtime.Modules[name].Run.Description:'')).join('; ')||'(none)'}. Loaded modules: ${Object.keys(runtime.Modules).join(', ')||'(none)'}. Compiled source files: ${JSON.stringify(modules.GetSources().CompiledNames())}. Bundle.Config: ${JSON.stringify(Bundle.Config)}. UI slots: ${this.Slots.join(', ')||'(unavailable)'}. Mounted UI: ${this.Mounted().join(', ')||'(none)'}. Reversible installations: ${modules.GetVersionCount()}. Built-in actions: ${CustomAgent.ActionNames.join(', ')}.`};
 	};
-
+/*
 	_['public'].GetRuntime=function () { return _(this).m_modules.GetRuntime(); };
 	_['public'].GetNames=function () { return _(this).m_modules.GetNames(); };
-	_['public'].HasVersion=function () { return _(this).m_modules.HasVersion(); };
 	_['public'].Rollback=function () { return _(this).m_modules.Rollback(); };
-	_['public'].Initialize=function () { return _(this).m_modules.Initialize(); };
 	_['public'].ReadCompiledSource=function (args={}) { return _(this).m_modules.GetSources().ReadCompiledSource(args); };
 	_['public'].ReadRemoteSource=function (args={}) { return _(this).m_modules.GetSources().ReadRemoteSource(args); };
 	_['public'].ReadInstalledSource=function (args={}) { return _(this).m_modules.GetSources().ReadInstalledSource(args); };
@@ -188,7 +275,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			default: return this.GetRuntime().Modules[name]?.Run;
 		}
 	};
-
+*/
 	_['private'].ExecuteAction=async function (action, context) {
 		if (!action?.arguments||'object'!==typeof action.arguments||Array.isArray(action.arguments)) return Helper.Error('Action arguments must be an object.');
 		let callback=_(this).ResolveAction(action.name);
@@ -219,7 +306,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].componentDidMount=function () {
 		let $this=_(this);
-		$this.GetRuntime().UI=this;
+		$this.m_modules.GetRuntime().UI=this;
 		let root=$this.m_view.GetRoot();
 		root.onclick=(event)=>{
 			let target=event.target.closest?.('[data-action],[data-ratio]');
@@ -248,11 +335,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.Update();
 		$this.m_ready=$this.Welcome();
 	};
-
-	_['private'].Update=function () {
-		this.m_view.Update(this.m_state, (key)=>this.Text(key), (id)=>this.SelectVersion(id));
-	};
-
+	
 	_['public'].Send=async function (text) {
 		let $this=_(this);
 		let message=String(text??$this.m_state.InputText).trim();
@@ -326,7 +409,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		this.Stop();
 		let root=$this.m_view.GetRoot();
 		if (root) root.onclick=root.oninput=root.onkeydown=null;
-		let runtime=this.GetRuntime();
+		let runtime=$this.m_modules.GetRuntime();
 		if (runtime.UI===this) delete runtime.UI;
 		for (let name of this.Mounted()) this.Unmount(name);
 		$this.m_view.Dispose();
@@ -339,19 +422,18 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['private'].Welcome=async function () {
 		let $this=_(this);
-		let app=$this;
 		let setupError='';
 		let runtime={message: ''};
 
 		try {
-			await app.Initialize();
+			await $this.Initialize();
 		}
 		catch (error) {
 			setupError=error.message||String(error);
 		}
 
 		try {
-			runtime=await app.InspectRuntime({});
+			runtime=await $this.InspectRuntime({});
 		}
 		catch (error) {
 			setupError=[setupError, error.message||String(error)].filter(Boolean).join('; ');
@@ -364,15 +446,33 @@ ${runtime.message}
 啟動結果：${setupError||'success'}
 瀏覽器語系：${navigator.language}
 `});
-			if (!app.GetState().messages.length) {
-				app.Reply(response.reply);
+			if (!$this.GetState().messages.length) {
+				$this.Reply(response.reply);
 			}
 		}
 		catch (error) {
-			app.ReportError(error);
+			$this.ReportError(error);
 		}
 	};
+	
+	_['private'].InvokeText=function(prompt, options) {
+		let text=await Flow.generate.text(prompt, options);
+		
+// 範本
+// 		text=`
+// modules.doSomething();
+// 
+// return {
+// 	ReplyText: 'done'
+// 	, Code: ${text}
+// }
+// `;
 
+		var f=new Function('modules', text);
+		var x=f.call(null, _(this).m_modules);
+		return x['ReplyText'];
+	};
+/*
 	_['private'].ReadResponse=function (value, allowAction=true) {
 		let raw=String(value??'');
 		let fallback=()=>{
@@ -440,7 +540,7 @@ ${runtime.message}
 		let response=await Flow.generate.text(prompt, options);
 		return this.ReadResponse(response?.text, allowAction);
 	};
-
+*/
 	_['private'].Instruction=function (runtime) {
 		let $this=_(this);
 		let dynamicList=$this.m_modules.DescribeDynamic();
@@ -479,9 +579,8 @@ generateVideo 可由使用者提出影片生成要求時執行，參數為 {prom
 		await $this.m_ready;
 		if (turn?.signal.aborted) return;
 
-		let app=$this;
-		let initial=app.GetState();
-		let imageInfo=await app.GetImageInfo();
+		let initial=$this.GetState();
+		let imageInfo=await $this.GetImageInfo();
 		if (turn?.signal.aborted) return;
 
 		let prior=initial.messages.slice();
@@ -514,7 +613,7 @@ ${message}
 		let reports=[];
 		let answer='';
 		let structured=false;
-		let runtime=await app.InspectRuntime({});
+		let runtime=await $this.InspectRuntime({});
 
 		for (;;) {
 			if (turn?.signal.aborted) return;
@@ -561,7 +660,7 @@ Choose the next action, revise the plan, or answer the user based on the actual 
 			try {
 				if (turn?.signal.aborted) return;
 
-				let result=await app.RunAction(action, true, data.source, data.Type);
+				let result=await $this.RunAction(action, true, data.source, data.Type);
 				if (turn?.signal.aborted) return;
 
 				if (result.conversationReset) {
@@ -569,7 +668,7 @@ Choose the next action, revise the plan, or answer the user based on the actual 
 App 已清空對話。以使用者這次要求的語言回覆。整個答覆請直接輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，從左大括號開始，到右大括號結束。
 `});
 					if (turn?.signal.aborted) return;
-					app.Reply(fresh.reply);
+					$this.Reply(fresh.reply);
 					return;
 				}
 
@@ -591,7 +690,7 @@ App 已清空對話。以使用者這次要求的語言回覆。整個答覆請�
 					, result: result.message
 					, ...(result.artifact?{artifact: $this.DescribeMedia(result.artifact)}:{})
 				});
-				runtime=await app.InspectRuntime({});
+				runtime=await $this.InspectRuntime({});
 			}
 			catch (error) {
 				reports.push({
@@ -622,14 +721,14 @@ Summarize these results and answer the user in natural language.
 		if (turn?.signal.aborted) return;
 
 		if (structured) {
-			app.UpdateConversation({
+			$this.UpdateConversation({
 				accumulatedChanges: changesOut
 				, generationPrompt: changesOut.length?promptOut:''
 				, selectedRatio: ratioOut
 			});
 		}
 
-		app.Reply(answer, {
+		$this.Reply(answer, {
 			accumulatedChanges: changesOut
 			, suggestedPrompt: promptOut||undefined
 			, aspectRatio: ratioOut
