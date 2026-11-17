@@ -17,13 +17,13 @@ var Media=Function.extend(Object, function () {
 	}
 	Media.From=function (value) {
 		if (!value||value instanceof Media) return value;
-		if ('string'!==typeof value.mimeType||!value.mimeType) throw new Error('Media needs a MIME type.');
+		if ('string'!==typeof value.mimeType||!value.mimeType) return Helper.Error('Media needs a MIME type.');
 		if (/^video\//.test(value.mimeType)) return new Media.Video(value);
 		if (/^image\//.test(value.mimeType)) return new Media.Image(value);
 		return new Media(value);
 	};
 	_['public'].ToBase64=async function () {
-		if (!this.Data) throw new Error('Media content is unavailable.');
+		if (!this.Data) return Helper.Error('Media content is unavailable.');
 		let bytes=new Uint8Array(await this.Data.arrayBuffer());
 		let parts=[];
 		for (let i=0; i<bytes.length; i+=32768) parts.push(String.fromCharCode(...bytes.subarray(i, i+32768)));

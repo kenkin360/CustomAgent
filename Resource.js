@@ -209,7 +209,7 @@ var Resource=Function.extend(Promise, function () {
 					await state.Element.decode();
 				}
 				if (!state.Element.naturalWidth) {
-					throw new Error('Failed to decode external picture');
+					return Helper.Error('Failed to decode external picture');
 				}
 			}
 			catch (error) {
@@ -260,7 +260,7 @@ var Resource=Function.extend(Promise, function () {
 				try {
 					let value=globalThis[state.Name];
 					if (!value||typeof value.then==='function'||(state.ReadyMember&&!value[state.ReadyMember])) {
-						throw new Error(`${state.Name} did not expose a ready module value.`);
+						return Helper.Error(`${state.Name} did not expose a ready module value.`);
 					}
 					finish(null, value);
 				}

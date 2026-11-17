@@ -95,18 +95,18 @@ var CustomAgent=Function.extend(React.Component, function () {
 	_['public'].UpdateConversation=function (patch) { _(this).SetValues(patch); };
 	_['public'].ResetConversation=function () {
 		let $this=_(this);
-		if ($this.m_state.IsGenerating) throw new Error('Wait for image generation to finish before resetting the conversation.');
+		if ($this.m_state.IsGenerating) return Helper.Error('Wait for image generation to finish before resetting the conversation.');
 		$this.SetValues({messages: [], accumulatedChanges: [], generationPrompt: '', inputText: ''});
 	};
 	_['public'].SetInput=function (value) { this.UpdateConversation({inputText: value}); };
 	_['public'].SetRatio=function (value) {
-		if (!['original', '1:1', '16:9', '9:16', '4:3', '3:4'].includes(value)) throw new Error('Unsupported aspect ratio.');
+		if (!['original', '1:1', '16:9', '9:16', '4:3', '3:4'].includes(value)) return Helper.Error('Unsupported aspect ratio.');
 		this.UpdateConversation({selectedRatio: value});
 	};
 	_['public'].SelectVersion=function (id) {
 		let $this=_(this);
 		let media=$this.m_state.History.find((item)=>item.Id===id);
-		if (!media) throw new Error('Media version not found: '+id);
+		if (!media) return Helper.Error('Media version not found: '+id);
 		$this.SetValues({activeMedia: media, currentMedia: media});
 	};
 	_['public'].SendMessage=function (text) { return this.Send(text); };
@@ -138,10 +138,10 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].GenerateVideo=async function (args={}, context={}) {
 		let image=context.image;
-		if ((args.useCurrentImageAsFirstFrame||args.useCurrentImageAsReference)&&!image) throw new Error('No current image is available.');
-		if (args.useCurrentImageAsFirstFrame&&args.firstFrameImageMediaId) throw new Error('Choose one first-frame image.');
+		if ((args.useCurrentImageAsFirstFrame||args.useCurrentImageAsReference)&&!image) return Helper.Error('No current image is available.');
+		if (args.useCurrentImageAsFirstFrame&&args.firstFrameImageMediaId) return Helper.Error('Choose one first-frame image.');
 		let references=args.referenceImageMediaIds||[];
-		if (!Array.isArray(references)) throw new Error('Reference image media IDs must be an array.');
+		if (!Array.isArray(references)) return Helper.Error('Reference image media IDs must be an array.');
 		let artifact=await new VideoService().Generate({
 			prompt: args.prompt
 			, aspectRatio: args.aspectRatio
@@ -158,7 +158,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let runtime=this.GetRuntime();
 		if ('string'===typeof args.name) {
 			let fn=runtime.Modules[args.name]?.Run;
-			if ('function'!==typeof fn) throw new Error('Runtime function not found: '+args.name);
+			if ('function'!==typeof fn) return Helper.Error('Runtime function not found: '+args.name);
 			return {message: `${args.name}: ${fn.Description||String(fn)}`};
 		}
 		let modules=_(this).m_modules;
@@ -190,23 +190,23 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['private'].ExecuteAction=async function (action, context) {
-		if (!action?.arguments||'object'!==typeof action.arguments||Array.isArray(action.arguments)) throw new Error('Action arguments must be an object.');
+		if (!action?.arguments||'object'!==typeof action.arguments||Array.isArray(action.arguments)) return Helper.Error('Action arguments must be an object.');
 		let callback=_(this).ResolveAction(action.name);
-		if ('function'!==typeof callback) throw new Error('Runtime function not found: '+String(action.name));
+		if ('function'!==typeof callback) return Helper.Error('Runtime function not found: '+String(action.name));
 		let value=await callback(action.arguments, context);
 		if (undefined!==value?.artifact) {
 			let artifact=value.artifact;
-			if (!artifact||'object'!==typeof artifact) throw new Error('An action media result needs file content and a MIME type.');
+			if (!artifact||'object'!==typeof artifact) return Helper.Error('An action media result needs file content and a MIME type.');
 			if (!(artifact instanceof Media)&&!artifact.data&&!artifact.base64&&artifact.mediaId) {
 				let content=await Flow.media.getBase64({mediaId: artifact.mediaId});
 				artifact={...artifact, ...content, mediaId: artifact.mediaId};
 			}
 			if (!(artifact instanceof Media)&&(!artifact.mimeType||!artifact.base64&&!(artifact.data instanceof Blob))) {
-				throw new Error('An action media result needs file content and a MIME type.');
+				return Helper.Error('An action media result needs file content and a MIME type.');
 			}
 			if (!(artifact instanceof Media)&&/^image\//.test(artifact.mimeType)&&artifact.base64) {
 				let image=await new ImageService().ReadActionResult({image: artifact}, context.image, action.name);
-				if (!image) throw new Error('An image result needs supported image content.');
+				if (!image) return Helper.Error('An image result needs supported image content.');
 				return {message: 'string'===typeof value.message?value.message:`${action.name} updated the current image.`, artifact: image, image};
 			}
 			return {message: 'string'===typeof value.message?value.message:`${action.name} completed.`, artifact};

@@ -42,7 +42,7 @@ var View=Function.extend(Object, function () {
 	};
 	_['public'].Mount=function (name, element, slot, slots) {
 		let target=_(this).m_root?.querySelector(`[data-slot="${slot}"]`);
-		if (!name||!(element instanceof HTMLElement)||!slots.includes(slot)||!target) throw new Error('Provide an extension name, an HTML element, and an available UI slot.');
+		if (!name||!(element instanceof HTMLElement)||!slots.includes(slot)||!target) return Helper.Error('Provide an extension name, an HTML element, and an available UI slot.');
 		this.Unmount(name);
 		_(this).m_mounted.set(name, element);
 		target.appendChild(element);

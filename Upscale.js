@@ -22,7 +22,7 @@ var Upscale=Function.extend(Object, function () {
 		let $this=_(this);
 		if (!$this.m_weights) {
 			$this.m_weights=fetch('https://esm.sh/gh/sb2702/websr@v0.1.0/weights/realesrgan/x4v3.bin?raw').then(async function(response) {
-				if (!response.ok) throw new Error('Failed to load weights: '+response.status);
+				if (!response.ok) return Helper.Error('Failed to load weights: '+response.status);
 				return response.arrayBuffer();
 			});
 		}
@@ -31,11 +31,11 @@ var Upscale=Function.extend(Object, function () {
 	};
 
 	_['public'].Run=async function (args={}, {image}) {
-		if (!image) throw new Error('Load an image first.');
+		if (!image) return Helper.Error('Load an image first.');
 		let width=args.width;
 		let height=args.height;
 		if ((width!==undefined||height!==undefined)&&(!Number.isSafeInteger(width)||width<1||!Number.isSafeInteger(height)||height<1)) {
-			throw new Error('Provide positive integer width and height in pixels.');
+			return Helper.Error('Provide positive integer width and height in pixels.');
 		}
 		let WebSR=await _(this).GetWebSR();
 		let source=new Image();
@@ -60,7 +60,7 @@ var Upscale=Function.extend(Object, function () {
 			let {default: WebSRWebGL}=await import('https://esm.sh/@websr/webgl@0.1.0?standalone');
 			let gl=WebSRWebGL.initWebGL(canvas);
 			if (!gl||!WebSRWebGL.supportsNetwork('realesrgan/x4v3', gl)) {
-				throw new Error('Real-ESRGAN requires WebGPU or a capable WebGL2 device.');
+				return Helper.Error('Real-ESRGAN requires WebGPU or a capable WebGL2 device.');
 			}
 			webgl=true;
 			upscaler=new WebSRWebGL({
@@ -76,7 +76,7 @@ var Upscale=Function.extend(Object, function () {
 			output.width=canvas.width;
 			output.height=canvas.height;
 			let context=output.getContext('2d');
-			if (!context) throw new Error('Output canvas is unavailable.');
+			if (!context) return Helper.Error('Output canvas is unavailable.');
 			if (webgl) {
 				let pixels=upscaler.readPixels();
 				let result=context.createImageData(output.width, output.height);
@@ -92,7 +92,7 @@ var Upscale=Function.extend(Object, function () {
 				fitted.width=width;
 				fitted.height=height;
 				let surface=fitted.getContext('2d');
-				if (!surface) throw new Error('Target canvas is unavailable.');
+				if (!surface) return Helper.Error('Target canvas is unavailable.');
 				let scale=Math.min(width/output.width, height/output.height);
 				let drawWidth=output.width*scale;
 				let drawHeight=output.height*scale;

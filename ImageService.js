@@ -14,7 +14,7 @@ var ImageService=Function.extend(Object, function () {
 		let source=new Image();
 		source.src=`data:${image.mimeType};base64,${image.base64}`;
 		await source.decode();
-		if (!source.naturalWidth||!source.naturalHeight) throw new Error('Unable to read image dimensions.');
+		if (!source.naturalWidth||!source.naturalHeight) return Helper.Error('Unable to read image dimensions.');
 		return {width: source.naturalWidth, height: source.naturalHeight};
 	};
 
@@ -43,11 +43,11 @@ var ImageService=Function.extend(Object, function () {
 
 	_['private'].GetContent=async function (media) {
 		if ('string'===typeof media?.base64&&media.base64&&'string'===typeof media.mimeType&&media.mimeType) return media;
-		if (!media?.mediaId) throw new Error('The image has neither content nor a mediaId.');
+		if (!media?.mediaId) return Helper.Error('The image has neither content nor a mediaId.');
 		let content=await Flow.media.getBase64({mediaId: media.mediaId});
-		if ('string'!==typeof content?.base64||!content.base64) throw new Error('Flow did not return the selected image content.');
+		if ('string'!==typeof content?.base64||!content.base64) return Helper.Error('Flow did not return the selected image content.');
 		let mimeType=content.mimeType||media.mimeType;
-		if (!mimeType) throw new Error('Flow did not return the selected image MIME type.');
+		if (!mimeType) return Helper.Error('Flow did not return the selected image MIME type.');
 		return {...media, ...content, mimeType};
 	};
 

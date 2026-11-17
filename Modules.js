@@ -29,7 +29,7 @@ var Modules=Function.extend(Object, function () {
 	_['public'].Rollback=function () {
 		let $this=_(this);
 		let installation=$this.m_versions.at(-1);
-		if (!installation) throw new Error('No previous module installation is available.');
+		if (!installation) return Helper.Error('No previous module installation is available.');
 		$this.RestoreGlobal(installation.Name, installation.PreviousGlobal);
 		if (installation.PreviousModule) installation.PreviousModule.Restore(this.GetRuntime().Modules, installation.Name);
 		else delete this.GetRuntime().Modules[installation.Name];
@@ -51,9 +51,9 @@ var Modules=Function.extend(Object, function () {
 		return $this.m_startup;
 	};
 	_['private'].Register=function (name, value, source, remote, track, previousGlobal) {
-		if (value==null) throw new Error(name+' did not expose a module value.');
+		if (value==null) return Helper.Error(name+' did not expose a module value.');
 		let runtime=this.GetRuntime();
-		if (undefined!==value.Run&&'function'!==typeof value.Run) throw new Error(name+' has an invalid Run method.');
+		if (undefined!==value.Run&&'function'!==typeof value.Run) return Helper.Error(name+' has an invalid Run method.');
 		let installation=new Installation(name, previousGlobal, Binding.Capture(runtime.Modules, name), this.m_sources.GetInstalled(name));
 		runtime.Modules[name]=value;
 		this.m_sources.SetInstalled(name, new Source(name, source, undefined, remote));
@@ -63,9 +63,9 @@ var Modules=Function.extend(Object, function () {
 	_['public'].LoadModule=async function (source, options={}) {
 		let $this=_(this);
 		let {name, Type, readyMember, track=true}=options;
-		if ('string'!==typeof name||!/^[A-Za-z_$][\w$]*$/.test(name)) throw new Error('Provide a module name.');
-		if ('string'!==typeof source||!source.trim()) throw new Error('Provide module source or a script URL.');
-		if ('function'!==typeof Type||!(Type.prototype instanceof Resource)) throw new Error('Provide a Resource type for the module.');
+		if ('string'!==typeof name||!/^[A-Za-z_$][\w$]*$/.test(name)) return Helper.Error('Provide a module name.');
+		if ('string'!==typeof source||!source.trim()) return Helper.Error('Provide module source or a script URL.');
+		if ('function'!==typeof Type||!(Type.prototype instanceof Resource)) return Helper.Error('Provide a Resource type for the module.');
 		let remote=Type===Resource.Module||Type.prototype instanceof Resource.Module;
 		if (remote&&$this.GetRuntime().Modules[name]) return {message: name+' is already loaded.'};
 		let previousGlobal=Binding.Capture(globalThis, name);
