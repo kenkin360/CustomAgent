@@ -1,14 +1,13 @@
+// @ts-nocheck
 import './Function.extend.js';
 import React from 'react';
 import { Flow } from 'flow-sdk';
 import * as fabric from 'fabric';
 import { Bundle } from './Bundle.js';
 import { Resource } from './Resource.js';
-
 var App=Function.extend(React.Component, function () {
 	var _=this(App);
 	App=_[App];
-
 	function App(props) {
 		_['base'].apply(this, arguments);
 		let $this=_(this);
@@ -18,18 +17,15 @@ var App=Function.extend(React.Component, function () {
 		$this.m_progress={File: '', Completed: 0, Total: Bundle.Config.length};
 		$this.m_reload=()=>_(this).Load(this);
 	}
-
 	_['public'].componentDidMount=function () {
 		Object.assign(globalThis, {React, Flow, fabric, App, Bundle, Resource});
 		_(this).Load(this);
 	};
-
 	_['private'].Load=function (component) {
 		let $this=_(component);
 		if ($this.m_loading) {
 			return;
 		}
-
 		$this.m_loading=true;
 		$this.m_error=null;
 		$this.m_progress={File: '', Completed: 0, Total: Bundle.Config.length};
@@ -45,7 +41,6 @@ var App=Function.extend(React.Component, function () {
 			else {
 				$this.m_agent=loaded.CustomAgent;
 			}
-
 			component.forceUpdate();
 		}, (error)=>{
 			$this.m_loading=false;
@@ -54,11 +49,9 @@ var App=Function.extend(React.Component, function () {
 			component.forceUpdate();
 		});
 	};
-
 	_['public'].render=function () {
 		let $this=_(this);
 		if ($this.m_agent) { return React.createElement($this.m_agent, {...this.props, HostSourceUrl: import.meta.url, SourceFiles: Bundle.Config}); }
-
 		let progress=$this.m_progress;
 		let percent=progress.Total?Math.round(progress.Completed*100/progress.Total):0;
 		let chinese=/^zh\b/i.test(navigator.language||'');
@@ -71,12 +64,10 @@ var App=Function.extend(React.Component, function () {
 				React.createElement('div', {style: {fontSize: 11, marginTop: 6, textAlign: 'right'}}, `${progress.Completed} / ${progress.Total}`),
 				$this.m_error&&React.createElement('button', {type: 'button', onClick: $this.m_reload, style: {marginTop: 12, padding: '7px 14px'}}, chinese?'重新載入':'Reload')));
 	};
-
 	_['private'].m_agent=null;
 	_['private'].m_error=null;
 	_['private'].m_loading=false;
 	_['private'].m_progress=null;
 	_['private'].m_reload=null;
 });
-
 export default App;
