@@ -26,7 +26,7 @@ var View=Function.extend(Object, function () {
 	};
 
 	_['public'].Dispose=function () {
-		let movie=this.Node('video');
+		let movie=this.Node('video').GetElement();
 		if (movie) { movie.pause(); movie.removeAttribute('src'); movie.load(); }
 
 		for (let url of _(this).m_urls.values()) URL.revokeObjectURL(url);
@@ -43,7 +43,7 @@ var View=Function.extend(Object, function () {
 
 	_['public'].GetLocale=function () { return _(this).m_locale; };
 
-	_['public'].Node=function (role) { return _(this).m_root?.querySelector(`[data-role="${role}"]`); };
+	_['public'].Node=function (role) { return new HtmlNode(_(this).m_root?.querySelector(`[data-role="${role}"]`)); };
 
 	_['public'].Localize=function (text) {
 		let root=_(this).m_root;
@@ -71,7 +71,7 @@ var View=Function.extend(Object, function () {
 	_['public'].Mounted=function () { return [..._(this).m_mounted.keys()]; };
 
 	_['private'].UpdateImage=function (media) {
-		let picture=new HtmlNode(this.Node('image'));
+		let picture=this.Node('image');
 		let image=picture.GetElement();
 		if (media instanceof Media.Image&&media.Data) {
 			let url=this.Url(media);
@@ -87,7 +87,7 @@ var View=Function.extend(Object, function () {
 	};
 
 	_['private'].UpdateVideo=function (media) {
-		let video=new HtmlNode(this.Node('video'));
+		let video=this.Node('video');
 		let movie=video.GetElement();
 		if (media instanceof Media.Video&&media.Data) {
 			let url=this.Url(media);
@@ -111,27 +111,27 @@ var View=Function.extend(Object, function () {
 		let root=_(this).m_root;
 		if (!root) { return; }
 
-		let node=(role)=>new HtmlNode(this.Node(role));
 		let imageText=_(this).UpdateImage(state.ActiveMedia);
 		let videoText=_(this).UpdateVideo(state.ActiveMedia);
-		node('empty').SetStyle('display', imageText===null&&videoText===null?'block':'none');
-		node('image-ratio').SetText(imageText??videoText??'');
-		node('generating').SetStyle('display', state.IsGenerating?'flex':'none');
+		this.Node('empty').SetStyle('display', imageText===null&&videoText===null?'block':'none');
+		this.Node('image-ratio').SetText(imageText??videoText??'');
+		this.Node('generating').SetStyle('display', state.IsGenerating?'flex':'none');
 		this.Localize(text);
-		new HtmlNode(root.querySelector('[data-action="send"]')).SetText(state.IsConsulting?text('stop'):text('send'));
-		let input=node('input');
+		this.Node('send').SetText(state.IsConsulting?text('stop'):text('send'));
+		let input=this.Node('input');
 		if (input.GetElement()?.value!==state.InputText) { input.SetValue(state.InputText); }
 
-		node('pending').SetStyle('display', state.AccumulatedChanges.length?'block':'none');
-		node('pending-count').SetText(`${text('confirmedChanges')} (${state.AccumulatedChanges.length})`);
-		node('pending-list').SetText(state.AccumulatedChanges.map((item, index)=>`${index+1}. ${item}`).join('\n'));
-		node('pending-list').SetStyle('whiteSpace', 'pre-wrap');
-		node('pending-prompt').SetText(state.GenerationPrompt||'');
-		let ratios=node('ratios').GetElement();
+		this.Node('pending').SetStyle('display', state.AccumulatedChanges.length?'block':'none');
+		this.Node('pending-count').SetText(`${text('confirmedChanges')} (${state.AccumulatedChanges.length})`);
+		let pending=this.Node('pending-list');
+		pending.SetText(state.AccumulatedChanges.map((item, index)=>`${index+1}. ${item}`).join('\n'));
+		pending.SetStyle('whiteSpace', 'pre-wrap');
+		this.Node('pending-prompt').SetText(state.GenerationPrompt||'');
+		let ratios=this.Node('ratios').GetElement();
 		for (let button of ratios?.querySelectorAll('[data-ratio]')||[]) button.classList.toggle('ca-selected', button.dataset.ratio===state.SelectedRatio);
-		_(this).m_messages.Update(node('message-list').GetElement(), state, text, (value)=>this.Url(value));
-		_(this).m_history.Update(node('history').GetElement(), state, select, (value)=>this.Url(value));
-		node('history-count').SetText(state.History.length);
+		_(this).m_messages.Update(this.Node('message-list').GetElement(), state, text, (value)=>this.Url(value));
+		_(this).m_history.Update(this.Node('history').GetElement(), state, select, (value)=>this.Url(value));
+		this.Node('history-count').SetText(state.History.length);
 		this.Prune(state);
 	};
 

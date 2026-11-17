@@ -238,14 +238,15 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let $this=_(this);
 		$this.m_modules.GetRuntime().UI=this;
 		let root=$this.m_view.GetRoot();
+		let input=$this.m_view.Node('input').GetElement();
 		let actions=[
 			['send', ()=>$this.m_state.IsConsulting?$this.Stop():$this.Send()]
 			, ['select', ()=>$this.SelectMedia()]
 			, ['camera', ()=>$this.CaptureCamera()]
 			, ['download', ()=>$this.Download()]
 			, ['generate', ()=>$this.Generate()]
-			, ['info', ()=>new HtmlNode($this.m_view.Node('dialog')).SetStyle('display', 'flex')]
-			, ['close-info', ()=>new HtmlNode($this.m_view.Node('dialog')).SetStyle('display', 'none')]
+			, ['info', ()=>$this.m_view.Node('dialog').SetStyle('display', 'flex')]
+			, ['close-info', ()=>$this.m_view.Node('dialog').SetStyle('display', 'none')]
 			, ['copy-prompt', async ()=>{
 				try {
 					await navigator.clipboard.writeText($this.m_state.GenerationPrompt||'');
@@ -266,13 +267,13 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 
 		root.oninput=(event)=>{
-			if (event.target===$this.m_view.Node('input')) {
+			if (event.target===input) {
 				$this.m_state.InputText=event.target.value;
 			}
 		};
 
 		root.onkeydown=(event)=>{
-			if (event.target===$this.m_view.Node('input')&&'Enter'===event.key&&!event.shiftKey&&!event.isComposing) {
+			if (event.target===input&&'Enter'===event.key&&!event.shiftKey&&!event.isComposing) {
 				event.preventDefault();
 				if (!$this.m_state.IsConsulting) {
 					$this.Send();
@@ -297,7 +298,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 
 		$this.m_ready=$this.Welcome().catch((error)=>{
-			$this.m_view.Node('app').style.visibility='visible';
+			$this.m_view.Node('app').SetStyle('visibility', 'visible');
 			$this.ReportError(error);
 		});
 	};
@@ -423,7 +424,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let locale=$this.m_view.GetLocale();
 		await DisplayText.GetInstance(locale);
 		$this.Update();
-		$this.m_view.Node('app').style.visibility='visible';
+		$this.m_view.Node('app').SetStyle('visibility', 'visible');
 		let startup=await $this.m_modules.Initialize();
 		if (startup instanceof Error) {
 			$this.ReportError(startup);
