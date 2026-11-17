@@ -359,7 +359,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 		try {
 			let response=await $this.RequestResponse('你是否了解自己的能力?', {systemInstruction: `
-你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，描述目前可用的能力。以下提供原碼檔案清單與執行狀態；需要原碼內容時可使用對應讀取操作。請依瀏覽器語系或使用者對話語言回覆；尚無語言線索時使用英文。整個答覆必須是單一標準 JSON 物件，例如 {"reply":"歡迎訊息"}，不要使用 Markdown 程式碼區塊或額外文字。
+你正在此 App 中啟動。請依照下列實際檢查結果簡短歡迎使用者，描述目前可用的能力。以下提供原碼檔案清單與執行狀態；需要原碼內容時可使用對應讀取操作。請依瀏覽器語系或使用者對話語言回覆；尚無語言線索時使用英文。整個答覆請直接輸出單一標準 JSON 物件，例如 {"reply":"歡迎訊息"}；從左大括號開始，到右大括號結束。
 ${runtime.message}
 啟動結果：${setupError||'success'}
 瀏覽器語系：${navigator.language}
@@ -450,7 +450,7 @@ ${runtime.message}
 實際能力：${runtime.message}
 本次對話中經由 loadModule 載入的模組：${dynamicList}
 
-每次答覆都只輸出一個完整的標準 JSON 物件，不要使用 Markdown 程式碼區塊或附加文字。一般討論回覆 {"reply":"給使用者看的文字"}。需要操作時回覆 {"reply":"","attemptPlan":[{"action":"操作名稱","attempts":1,"reason":"目的與重試條件"}],"localAction":{"name":"操作名稱","arguments":{}}}；同一次僅執行一項操作，App 回傳結果後再依結果繼續、調整或答覆。使用 JSON 標準語法，字串內的換行與引號須正確跳脫。
+每次答覆請直接輸出一個完整的標準 JSON 物件，從左大括號開始，到右大括號結束。一般討論回覆 {"reply":"給使用者看的文字"}。需要操作時回覆 {"reply":"","attemptPlan":[{"action":"操作名稱","attempts":1,"reason":"目的與重試條件"}],"localAction":{"name":"操作名稱","arguments":{}}}；同一次僅執行一項操作，App 回傳結果後再依結果繼續、調整或答覆。使用 JSON 標準語法，字串內的換行與引號須正確跳脫。
 readCompiledSource 空參數列出啟動時已完整拆解的固定 host 檔案，{file} 取得完整原碼；readRemoteSource 空參數列出 Bundle.Config 等遠端來源，{name} 可重新取得其內容；readInstalledSource 空參數列出已安裝模組，{name} 取得安裝時保留的完整原碼，遠端安裝者可重新取得。inspectRuntime 檢查現有函數、模組及原碼入口。
 loadModule 的原碼或遠端腳本 URL 放在同一個 JSON 物件的 source 字串；sourceType 為 javascript 或 js（原碼），或 text 或 url（遠端腳本 URL）。localAction 為 {"name":"loadModule","arguments":{"name":"模組名稱"}}，並在 attemptPlan 列出 loadModule。自行撰寫類型時，以頂層 var 和 Function.extend(Base, factory) 宣告，將建構子、方法及靜態成員寫在類別定義內；需要完整範例時，可透過 readInstalledSource 查看 DrawRectangle 原碼。可呼叫的模組提供靜態 Run。
 直接以模組名稱作為操作名稱呼叫其 Run；rollback 撤銷上一項模組安裝；resetConversation 清空對話。需要實作新功能時可讀程式碼並撰寫、載入模組。
@@ -566,7 +566,7 @@ Choose the next action, revise the plan, or answer the user based on the actual 
 
 				if (result.conversationReset) {
 					let fresh=await $this.RequestResponse('.', {systemInstruction: `
-App 已清空對話。以使用者這次要求的語言回覆。整個答覆只輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，不要附加文字或 Markdown。
+App 已清空對話。以使用者這次要求的語言回覆。整個答覆請直接輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，從左大括號開始，到右大括號結束。
 `});
 					if (turn?.signal.aborted) return;
 					app.Reply(fresh.reply);
@@ -610,7 +610,7 @@ ${reports.map(JSON.stringify).join('\n')}
 Summarize these results and answer the user in natural language.
 `;
 			let response=await $this.RequestResponse(`${prompt}. `, {systemInstruction: `
-依使用者的語言，以 App 回報的結果為依據回答。整個答覆只輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，不要附加文字或 Markdown。
+依使用者的語言，以 App 回報的結果為依據回答。整個答覆請直接輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，從左大括號開始，到右大括號結束。
 `});
 			if (turn?.signal.aborted) return;
 			answer=response.reply;
@@ -652,7 +652,7 @@ Actual result: ${JSON.stringify(details)}
 Reply briefly to the user in the language of the current conversation.
 `;
 		let response=await _(this).RequestResponse(`${prompt}. `, {systemInstruction: `
-根據 App 回報的結果，依使用者當前對話語言簡短回覆。整個答覆只輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，不要附加文字或 Markdown。
+根據 App 回報的結果，依使用者當前對話語言簡短回覆。整個答覆請直接輸出單一標準 JSON 物件 {"reply":"給使用者看的文字"}，從左大括號開始，到右大括號結束。
 `});
 
 		this.Reply(response.reply, image?{includedMedia: image}:{});
