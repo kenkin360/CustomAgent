@@ -14,9 +14,9 @@ var View=Function.extend(Object, function () {
 	_['public'].SetRoot=function (element) { _(this).m_root=element; };
 	_['public'].GetRoot=function () { return _(this).m_root; };
 	_['public'].Url=function (media) {
-		if (!media?.Data) return '';
+		if (!media?.Data) { return ''; }
 		let urls=_(this).m_urls;
-		if (!urls.has(media)) urls.set(media, URL.createObjectURL(media.Data));
+		if (!urls.has(media)) { urls.set(media, URL.createObjectURL(media.Data)); }
 		return urls.get(media);
 	};
 	_['public'].Dispose=function () {
@@ -36,13 +36,13 @@ var View=Function.extend(Object, function () {
 	_['public'].Node=function (role) { return _(this).m_root?.querySelector(`[data-role="${role}"]`); };
 	_['public'].Localize=function (text) {
 		let root=_(this).m_root;
-		if (!root) return;
+		if (!root) { return; }
 		for (let node of root.querySelectorAll('[data-i18n]')) node.textContent=text(node.dataset.i18n);
 		for (let node of root.querySelectorAll('[data-i18n-placeholder]')) node.placeholder=text(node.dataset.i18nPlaceholder);
 	};
 	_['public'].Mount=function (name, element, slot, slots) {
 		let target=_(this).m_root?.querySelector(`[data-slot="${slot}"]`);
-		if (!name||!(element instanceof HTMLElement)||!slots.includes(slot)||!target) return Helper.Error('Provide an extension name, an HTML element, and an available UI slot.');
+		if (!name||!(element instanceof HTMLElement)||!slots.includes(slot)||!target) { return Helper.Error('Provide an extension name, an HTML element, and an available UI slot.'); }
 		this.Unmount(name);
 		_(this).m_mounted.set(name, element);
 		target.appendChild(element);
@@ -55,7 +55,7 @@ var View=Function.extend(Object, function () {
 	_['public'].Mounted=function () { return [..._(this).m_mounted.keys()]; };
 	_['public'].Update=function (state, text, select) {
 		let root=_(this).m_root;
-		if (!root) return;
+		if (!root) { return; }
 		let media=state;
 		let draft=state;
 		let chat=state;
@@ -68,13 +68,13 @@ var View=Function.extend(Object, function () {
 		let showVideo=media.ActiveMedia instanceof Media.Video&&!!media.ActiveMedia.Data;
 		if (showImage&&image) {
 			let url=this.Url(media.ActiveMedia);
-			if (image.src!==url) picture.SetSource(url);
+			if (image.src!==url) { picture.SetSource(url); }
 		}
-		else if (image?.getAttribute('src')) image.removeAttribute('src');
+		else if (image?.getAttribute('src')) { image.removeAttribute('src'); }
 		picture.Show(showImage);
 		if (showVideo&&movie) {
 			let url=this.Url(media.ActiveMedia);
-			if (movie.src!==url) movie.src=url;
+			if (movie.src!==url) { movie.src=url; }
 		}
 		else if (movie?.getAttribute('src')) {
 			movie.pause();
@@ -88,7 +88,7 @@ var View=Function.extend(Object, function () {
 		this.Localize(text);
 		new HtmlNode(root.querySelector('[data-action="send"]')).SetText(chat.IsConsulting?text('stop'):text('send'));
 		let input=node('input');
-		if (input.GetElement()?.value!==chat.InputText) input.SetValue(chat.InputText);
+		if (input.GetElement()?.value!==chat.InputText) { input.SetValue(chat.InputText); }
 		node('pending').SetStyle('display', draft.AccumulatedChanges.length?'block':'none');
 		node('pending-count').SetText(`${text('confirmedChanges')} (${draft.AccumulatedChanges.length})`);
 		node('pending-list').SetText(draft.AccumulatedChanges.map((item, index)=>`${index+1}. ${item}`).join('\n'));

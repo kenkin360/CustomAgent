@@ -25,7 +25,7 @@ var Bundle=Function.extend(Function, function () {
 			}
 			catch (error) {
 				onProgress?.({...progress, Error: error});
-				throw error;
+				return error instanceof Error?error:new Error(String(error));
 			}
 		}
 		return loaded;
@@ -47,11 +47,9 @@ var Bundle=Function.extend(Function, function () {
 		, ['MessageList', Bundle.CustomAgent('MessageList.js')]
 		, ['HistoryList', Bundle.CustomAgent('HistoryList.js')]
 		, ['Modules', Bundle.CustomAgent('Modules.js')]
-		, ['Binding', Bundle.CustomAgent('Binding.js')]
-		, ['Installation', Bundle.CustomAgent('models/Installation.js')]
 		, ['Sources', Bundle.CustomAgent('Sources.js')]
 		, ['Source', Bundle.CustomAgent('models/Source.js')]
-		, ['Source', Bundle.CustomAgent('Helper.js')]
+		, ['Helper', Bundle.CustomAgent('Helper.js')]
 		, ['cv', 'https://esm.sh/gh/TechStark/opencv-js/dist/opencv.js?raw', 'Mat']
 		, ['agentTemplate', Bundle.CustomAgent('views/agent.html.js')]
 	];

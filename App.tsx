@@ -26,7 +26,9 @@ var App=Function.extend(React.Component, function () {
 
 	_['private'].Load=function (component) {
 		let $this=_(component);
-		if ($this.m_loading) return;
+		if ($this.m_loading) {
+			return;
+		}
 		$this.m_loading=true;
 		$this.m_error=null;
 		$this.m_progress={File: '', Completed: 0, Total: Bundle.Config.length};
@@ -36,7 +38,12 @@ var App=Function.extend(React.Component, function () {
 			component.forceUpdate();
 		}).then((loaded)=>{
 			$this.m_loading=false;
-			$this.m_agent=loaded.CustomAgent;
+			if (loaded instanceof Error) {
+				$this.m_error=loaded;
+			}
+			else {
+				$this.m_agent=loaded.CustomAgent;
+			}
 			component.forceUpdate();
 		}, (error)=>{
 			$this.m_loading=false;
@@ -48,7 +55,7 @@ var App=Function.extend(React.Component, function () {
 
 	_['public'].render=function () {
 		let $this=_(this);
-		if ($this.m_agent) return React.createElement($this.m_agent, {...this.props, HostSourceUrl: import.meta.url, SourceFiles: Bundle.Config});
+		if ($this.m_agent) { return React.createElement($this.m_agent, {...this.props, HostSourceUrl: import.meta.url, SourceFiles: Bundle.Config}); }
 		let progress=$this.m_progress;
 		let percent=progress.Total?Math.round(progress.Completed*100/progress.Total):0;
 		let chinese=/^zh\b/i.test(navigator.language||'');

@@ -6,7 +6,7 @@ var Media=Function.extend(Object, function () {
 		_['base'].apply(this, arguments);
 		this.Id=value.id||'media_'+Date.now()+'_'+Math.random().toString(36).slice(2);
 		this.MimeType=value.mimeType||'application/octet-stream';
-		if (value.data instanceof Blob) this.Data=value.data;
+		if (value.data instanceof Blob) { this.Data=value.data; }
 		else if (value.base64) {
 			let binary=atob(value.base64);
 			let bytes=new Uint8Array(binary.length);
@@ -16,14 +16,14 @@ var Media=Function.extend(Object, function () {
 		else this.Data=null;
 	}
 	Media.From=function (value) {
-		if (!value||value instanceof Media) return value;
-		if ('string'!==typeof value.mimeType||!value.mimeType) return Helper.Error('Media needs a MIME type.');
-		if (/^video\//.test(value.mimeType)) return new Media.Video(value);
-		if (/^image\//.test(value.mimeType)) return new Media.Image(value);
+		if (!value||value instanceof Media) { return value; }
+		if ('string'!==typeof value.mimeType||!value.mimeType) { return Helper.Error('Media needs a MIME type.'); }
+		if (/^video\//.test(value.mimeType)) { return new Media.Video(value); }
+		if (/^image\//.test(value.mimeType)) { return new Media.Image(value); }
 		return new Media(value);
 	};
 	_['public'].ToBase64=async function () {
-		if (!this.Data) return Helper.Error('Media content is unavailable.');
+		if (!this.Data) { return Helper.Error('Media content is unavailable.'); }
 		let bytes=new Uint8Array(await this.Data.arrayBuffer());
 		let parts=[];
 		for (let i=0; i<bytes.length; i+=32768) parts.push(String.fromCharCode(...bytes.subarray(i, i+32768)));

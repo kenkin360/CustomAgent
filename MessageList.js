@@ -11,7 +11,7 @@ var MessageList=Function.extend(Object, function () {
 	_['public'].Update=function (list, state, text, url) {
 		let $this=_(this);
 		if (!list) { $this.m_lastNode=null; return; }
-		if (state.Messages===$this.m_lastMessages&&state.IsConsulting===$this.m_lastConsulting&&list===$this.m_lastNode) return;
+		if (state.Messages===$this.m_lastMessages&&state.IsConsulting===$this.m_lastConsulting&&list===$this.m_lastNode) { return; }
 		let items=state.Messages.map((message)=>{
 			let item=document.createElement('div');
 			item.className=`ca-message ca-${message.Sender}`;
@@ -26,7 +26,7 @@ var MessageList=Function.extend(Object, function () {
 					preview.preload='metadata';
 				}
 				preview.src=url(message.IncludedMedia);
-				if (message.IncludedMedia instanceof Media.Image) preview.alt='Media result';
+				if (message.IncludedMedia instanceof Media.Image) { preview.alt='Media result'; }
 				item.appendChild(preview);
 			}
 			let body=document.createElement('div');

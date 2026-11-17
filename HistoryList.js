@@ -21,11 +21,15 @@ var HistoryList=Function.extend(Object, function () {
 					thumbnail.muted=true;
 					thumbnail.playsInline=true;
 					thumbnail.preload='metadata';
-					thumbnail.onloadedmetadata=()=>{ if (thumbnail.duration>0.1) thumbnail.currentTime=0.1; };
+					thumbnail.onloadedmetadata=()=>{
+						if (thumbnail.duration>0.1) {
+							thumbnail.currentTime=0.1;
+						}
+					};
 				}
 				if (thumbnail) {
 					thumbnail.src=url(media);
-					if (media instanceof Media.Image) thumbnail.alt=state.Labels.get(media.Id)||'Media';
+					if (media instanceof Media.Image) { thumbnail.alt=state.Labels.get(media.Id)||'Media'; }
 					button.appendChild(thumbnail);
 				}
 				else button.textContent=media.MimeType;

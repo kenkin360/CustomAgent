@@ -14,7 +14,7 @@ var ImageService=Function.extend(Object, function () {
 		let source=new Image();
 		source.src=`data:${image.mimeType};base64,${image.base64}`;
 		await source.decode();
-		if (!source.naturalWidth||!source.naturalHeight) return Helper.Error('Unable to read image dimensions.');
+		if (!source.naturalWidth||!source.naturalHeight) { return Helper.Error('Unable to read image dimensions.'); }
 		return {width: source.naturalWidth, height: source.naturalHeight};
 	};
 
@@ -25,35 +25,38 @@ var ImageService=Function.extend(Object, function () {
 		return width/a+':'+height/a;
 	};
 
-	_['public'].ReadActionResult=async function (value, image, actionName) {
+	_['public'].ReadActionResult=async function (value, image, label) {
 		let output=value&&'object'===typeof value&&'image' in value?value.image:value;
-		if (!output||'string'!==typeof output.base64||!/^image\/(png|jpeg|webp)$/.test(output.mimeType)) return null;
+		if (!output||'string'!==typeof output.base64||!/^image\/(png|jpeg|webp)$/.test(output.mimeType)) { return null; }
 		let dimensions=await this.GetDimensions(output);
+		if (dimensions instanceof Error) {
+			return dimensions;
+		}
 		let original=image||{};
 		return {
 			...original, id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`
 			, base64: output.base64, mimeType: output.mimeType, mediaId: undefined
 			, ...dimensions
-			, prompt: `Local runtime edit: ${actionName}`
+			, prompt: `Local runtime edit: ${label}`
 			, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
 			, aspectRatio: this.GetAspectRatio(dimensions)
-			, title: output.title||`${original.title||'Image'} · ${actionName}`
+			, title: output.title||`${original.title||'Image'} · ${label}`
 		};
 	};
 
 	_['private'].GetContent=async function (media) {
-		if ('string'===typeof media?.base64&&media.base64&&'string'===typeof media.mimeType&&media.mimeType) return media;
-		if (!media?.mediaId) return Helper.Error('The image has neither content nor a mediaId.');
+		if ('string'===typeof media?.base64&&media.base64&&'string'===typeof media.mimeType&&media.mimeType) { return media; }
+		if (!media?.mediaId) { return Helper.Error('The image has neither content nor a mediaId.'); }
 		let content=await Flow.media.getBase64({mediaId: media.mediaId});
-		if ('string'!==typeof content?.base64||!content.base64) return Helper.Error('Flow did not return the selected image content.');
+		if ('string'!==typeof content?.base64||!content.base64) { return Helper.Error('Flow did not return the selected image content.'); }
 		let mimeType=content.mimeType||media.mimeType;
-		if (!mimeType) return Helper.Error('Flow did not return the selected image MIME type.');
+		if (!mimeType) { return Helper.Error('Flow did not return the selected image MIME type.'); }
 		return {...media, ...content, mimeType};
 	};
 
 	_['public'].Select=async function () {
 		let selected=await Flow.media.select({filter: 'image'});
-		if (!selected) return null;
+		if (!selected) { return null; }
 		selected=await _(this).GetContent(selected);
 		let dimensions=await this.GetDimensions(selected);
 		return {
@@ -72,7 +75,7 @@ var ImageService=Function.extend(Object, function () {
 	_['public'].Capture=async function () {
 		let flow=Flow;
 		let photo=await flow.camera.capture({facingMode: 'user'});
-		if (!photo) return null;
+		if (!photo) { return null; }
 		let dimensions=await this.GetDimensions(photo);
 		let upload=await flow.upload({
 			base64: photo.base64
@@ -125,7 +128,7 @@ var ImageService=Function.extend(Object, function () {
 	};
 
 	_['public'].Download=function (image) {
-		if (!image) return Promise.resolve();
+		if (!image) { return Promise.resolve(); }
 		return Flow.download({
 			base64: image.base64
 			, mimeType: image.mimeType||'image/png'

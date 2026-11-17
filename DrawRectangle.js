@@ -7,7 +7,7 @@ var DrawRectangle=Function.extend(Object, function () {
 	}
 
 	_['private'].Validate=function (value) {
-		if (!value||typeof value!=='object') return Helper.Error('Rectangle arguments are missing.');
+		if (!value||typeof value!=='object') { return Helper.Error('Rectangle arguments are missing.'); }
 		let fraction=(number)=>typeof number==='number'&&Number.isFinite(number)&&number>=0&&number<=1;
 		let color=(text)=>typeof text==='string'&&/^#[\da-fA-F]{6}$/.test(text);
 		if (!fraction(value.x)||!fraction(value.y)||!fraction(value.width)||!fraction(value.height)||
@@ -21,8 +21,11 @@ var DrawRectangle=Function.extend(Object, function () {
 
 	_['public'].Run=async function (value, context) {
 		let image=context.image;
-		if (!image) return Helper.Error('Load an image before drawing a rectangle.');
+		if (!image) { return Helper.Error('Load an image before drawing a rectangle.'); }
 		let args=_(this).Validate(value);
+		if (args instanceof Error) {
+			return args;
+		}
 		let source=new Image();
 		source.src=`data:${image.mimeType};base64,${image.base64}`;
 		await source.decode();
@@ -30,7 +33,7 @@ var DrawRectangle=Function.extend(Object, function () {
 		canvas.width=source.naturalWidth;
 		canvas.height=source.naturalHeight;
 		let output=canvas.getContext('2d');
-		if (!output) return Helper.Error('The drawing canvas is unavailable.');
+		if (!output) { return Helper.Error('The drawing canvas is unavailable.'); }
 		output.drawImage(source, 0, 0);
 		output.lineWidth=args.strokeWidth;
 		output.strokeStyle=args.stroke;

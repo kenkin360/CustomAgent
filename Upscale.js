@@ -15,33 +15,39 @@ var Upscale=Function.extend(Object, function () {
 			$this.m_websr=new Resource.Module('WebSR', 'https://esm.sh/gh/sb2702/websr/dist/websr.js?raw');
 		}
 		try { return await $this.m_websr; }
-		catch (error) { $this.m_websr=null; throw error; }
+		catch (error) { $this.m_websr=null; return Helper.Error(error); }
 	};
 
 	_['private'].GetWeights=async function () {
 		let $this=_(this);
 		if (!$this.m_weights) {
 			$this.m_weights=fetch('https://esm.sh/gh/sb2702/websr@v0.1.0/weights/realesrgan/x4v3.bin?raw').then(async function(response) {
-				if (!response.ok) return Helper.Error('Failed to load weights: '+response.status);
+				if (!response.ok) { return Helper.Error('Failed to load weights: '+response.status); }
 				return response.arrayBuffer();
 			});
 		}
 		try { return await $this.m_weights; }
-		catch (error) { $this.m_weights=null; throw error; }
+		catch (error) { $this.m_weights=null; return Helper.Error(error); }
 	};
 
 	_['public'].Run=async function (args={}, {image}) {
-		if (!image) return Helper.Error('Load an image first.');
+		if (!image) { return Helper.Error('Load an image first.'); }
 		let width=args.width;
 		let height=args.height;
 		if ((width!==undefined||height!==undefined)&&(!Number.isSafeInteger(width)||width<1||!Number.isSafeInteger(height)||height<1)) {
 			return Helper.Error('Provide positive integer width and height in pixels.');
 		}
 		let WebSR=await _(this).GetWebSR();
+		if (WebSR instanceof Error) {
+			return WebSR;
+		}
 		let source=new Image();
 		source.src='data:'+image.mimeType+';base64,'+image.base64;
 		await source.decode();
 		let buffer=await _(this).GetWeights();
+		if (buffer instanceof Error) {
+			return buffer;
+		}
 		let canvas=document.createElement('canvas');
 		let upscaler;
 		let webgl=false;
@@ -76,7 +82,7 @@ var Upscale=Function.extend(Object, function () {
 			output.width=canvas.width;
 			output.height=canvas.height;
 			let context=output.getContext('2d');
-			if (!context) return Helper.Error('Output canvas is unavailable.');
+			if (!context) { return Helper.Error('Output canvas is unavailable.'); }
 			if (webgl) {
 				let pixels=upscaler.readPixels();
 				let result=context.createImageData(output.width, output.height);
@@ -92,7 +98,7 @@ var Upscale=Function.extend(Object, function () {
 				fitted.width=width;
 				fitted.height=height;
 				let surface=fitted.getContext('2d');
-				if (!surface) return Helper.Error('Target canvas is unavailable.');
+				if (!surface) { return Helper.Error('Target canvas is unavailable.'); }
 				let scale=Math.min(width/output.width, height/output.height);
 				let drawWidth=output.width*scale;
 				let drawHeight=output.height*scale;

@@ -225,68 +225,6 @@ var Resource=Function.extend(Promise, function () {
 	Resource.Module=Module;
 	Resource.Picture=Picture;
 
-	var Inline=Function.extend(Resource, function () {
-		var _=this(Inline);
-		Inline=_[Inline];
-
-		function Inline(name, source, readyMember) {
-			if (typeof name==='function') {
-				_['base'].apply(this, arguments);
-				return;
-			}
-			let url=`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`;
-			_['base'].call(this, name, url, readyMember)(function () {
-				this.Start();
-			});
-		}
-
-		_['public'].Start=function () {
-			let $this=_(this);
-			let state=$this.GetState();
-			if (typeof document==='undefined') {
-				$this.Finish(new Error('Inline modules require a browser environment'));
-				return;
-			}
-			let element=document.createElement('script');
-			state.Element=element;
-			state.Created=true;
-			element.id=state.Name+'-loader';
-			element.async=true;
-			let finish=(error, value)=>{
-				window.removeEventListener('error', state.EvaluationHandler, true);
-				$this.Finish(error, value);
-			};
-			state.LoadHandler=()=>{
-				try {
-					let value=globalThis[state.Name];
-					if (!value||typeof value.then==='function'||(state.ReadyMember&&!value[state.ReadyMember])) {
-						return Helper.Error(`${state.Name} did not expose a ready module value.`);
-					}
-					finish(null, value);
-				}
-				catch (error) { finish(error); }
-			};
-			state.ErrorHandler=()=>finish(new Error(`Failed to load inline module ${state.Name}.`));
-			state.EvaluationHandler=(event)=>{
-				if (event.filename!==state.Url&&event.filename!==element.src) return;
-				event.preventDefault();
-				event.stopImmediatePropagation();
-				let location=event.lineno?` at ${event.lineno}:${event.colno||1}`:'';
-				let reason=event.error?.message||event.message||'Script evaluation failed';
-				finish(new Error(`${state.Name}: ${event.error?.name||'Error'}: ${reason}${location}`));
-			};
-			window.addEventListener('error', state.EvaluationHandler, true);
-			element.addEventListener('load', state.LoadHandler);
-			element.addEventListener('error', state.ErrorHandler);
-			try {
-				element.src=state.Url;
-				(document.head||document.body||document.documentElement).appendChild(element);
-			}
-			catch (error) { finish(error); }
-		};
-	});
-
-	Resource.Inline=Inline;
 });
 
 export { Resource };

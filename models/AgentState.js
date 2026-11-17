@@ -18,12 +18,12 @@ var AgentState=Function.extend(Object, function () {
 		this.Files=new WeakMap();
 	}
 	_['public'].Remember=function (media, value) {
-		if (!media||!value) return;
-		if (value.title) this.Labels.set(media.Id, value.title);
-		if (value.mediaId) this.MediaIds.set(media.Id, value.mediaId);
+		if (!media||!value) { return; }
+		if (value.title) { this.Labels.set(media.Id, value.title); }
+		if (value.mediaId) { this.MediaIds.set(media.Id, value.mediaId); }
 	};
 	_['public'].AsMedia=function (value) {
-		if (!value||value instanceof Media) return value;
+		if (!value||value instanceof Media) { return value; }
 		let file=this.Files.get(value);
 		if (!file) {
 			file=Media.From(value);
@@ -44,13 +44,15 @@ var AgentState=Function.extend(Object, function () {
 			this.History=patch.history.map((item)=>this.AsMedia(item));
 			for (let i=0; i<this.History.length; i++) this.Remember(this.History[i], patch.history[i]);
 		}
-		if ('isGenerating' in patch) this.IsGenerating=patch.isGenerating;
-		if ('selectedRatio' in patch) this.SelectedRatio=patch.selectedRatio;
-		if ('accumulatedChanges' in patch) this.AccumulatedChanges=patch.accumulatedChanges.filter((item)=>'string'===typeof item);
-		if ('generationPrompt' in patch) this.GenerationPrompt=patch.generationPrompt;
-		if ('messages' in patch) this.Messages=patch.messages.map((entry)=>entry instanceof Message?entry:new Message({...entry, includedMedia: this.AsMedia(entry.includedMedia)}));
-		if ('inputText' in patch) this.InputText=patch.inputText;
-		if ('isConsulting' in patch) this.IsConsulting=patch.isConsulting;
+		if ('isGenerating' in patch) { this.IsGenerating=patch.isGenerating; }
+		if ('selectedRatio' in patch) { this.SelectedRatio=patch.selectedRatio; }
+		if ('accumulatedChanges' in patch) { this.AccumulatedChanges=patch.accumulatedChanges.filter((item)=>'string'===typeof item); }
+		if ('generationPrompt' in patch) { this.GenerationPrompt=patch.generationPrompt; }
+		if ('messages' in patch) {
+			this.Messages=patch.messages.map((entry)=>entry instanceof Message?entry:new Message({...entry, includedMedia: this.AsMedia(entry.includedMedia)}));
+		}
+		if ('inputText' in patch) { this.InputText=patch.inputText; }
+		if ('isConsulting' in patch) { this.IsConsulting=patch.isConsulting; }
 	};
 	_['public'].ToSnapshot=function () {
 		let describe=(media)=>media?{...media.toJSON(), data: media.Data, title: this.Labels.get(media.Id), mediaId: this.MediaIds.get(media.Id)}:null;
