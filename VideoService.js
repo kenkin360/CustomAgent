@@ -27,8 +27,8 @@ var VideoService=Function.extend(Object, function () {
 		return image.MediaId;
 	};
 
-	_['public'].Generate=async function (options={}, context={}) {
-		let image=context.image;
+	_['public'].Generate=async function (options, context) {
+		let image=context?.image;
 		if ((options.useCurrentImageAsFirstFrame||options.useCurrentImageAsReference)&&!image) { return Helper.Error('No current image is available.'); }
 
 		if (options.useCurrentImageAsFirstFrame&&options.firstFrameImageMediaId) { return Helper.Error('Choose one first-frame image.'); }
