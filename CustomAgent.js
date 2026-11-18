@@ -383,7 +383,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['private'].Welcome=async function () {
 		let $this=_(this);
-		let locale=$this.m_view.GetLocale();
 		await DisplayText.GetInstance(locale);
 		$this.Update();
 		$this.m_view.Node('app').SetStyle('visibility', 'visible');
@@ -406,7 +405,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 			return;
 		}
 
-		let reply=await $this.InvokeText(`你是否了解自己的能力？請簡短歡迎使用者。瀏覽器語系：${locale}。可用模組：${Executable.GetNames().join(', ')}。`, {systemInstruction: $this.Instruction()});
+		let reply=await $this.InvokeText('.', {systemInstruction: $this.Instruction()});
+
 		if (reply instanceof Error) {
 			$this.ReportError(reply);
 		}
@@ -415,8 +415,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 	};
 
+	'@@DeveloperWarn("禁止催眠式及 negative prompt")'
 	_['private'].Instruction=function () {
-		return `你是 CustomAgent App 內的 Assistant。輸出可直接作為 JavaScript AsyncFunction 函式本體執行的原始碼。函式必須回傳依目前使用者對話語言撰寫的字串；單純回答文字時，直接回傳字串。
+		return `
+輸出可直接作為 JavaScript AsyncFunction 函式本體執行的原始碼。
+函式必須回傳依目前使用者對話語言撰寫的字串；單純回答文字時，直接回傳字串。
 函式本體收到 Executable、app、context、apply、source 參數，可用成員如下：
 - Executable.GetInstance(name)：取得已安裝的 Executable 實例，直接呼叫並 await 其 Run 方法。
 - context：實際的 {image, artifact} Media 物件實例；直接檢查類型與成員。
@@ -428,7 +431,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 - app.ReadCompiledSource({file})、app.ReadRemoteSource({name})、app.ReadInstalledSource({name})：查詢及讀取原碼。
 - app：目前的 CustomAgent 實例。使用 UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) 記錄已確認的修改、ResetConversation() 清除對話，影片請求使用 GenerateVideo(options, context)。只有使用者按下 Generate 才會開始影像生成。
 - Executable.Executions：本次工作階段先前產生的程式及其實際執行結果。
-所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error，並以 Helper.Error(error) 回傳錯誤。流程分派使用實際類型與方法呼叫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式識別字與註解使用英文；向使用者顯示的文字依對話語言撰寫。修復失敗程式時，根據已完成的操作接續執行剩餘部分。`;
+所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error，並以 Helper.Error(error) 回傳錯誤。流程分派使用實際類型與方法呼叫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式識別字與註解使用英文；向使用者顯示的文字依對話語言撰寫。修復失敗程式時，根據已完成的操作接續執行剩餘部分。
+
+--
+瀏覽器語系：
+${_(this).m_view.GetLocale()}
+可用模組：
+${Executable.GetNames().join('\r\n')}
+`;
 	};
 
 	_['private'].ApplyResult=async function (result) {
