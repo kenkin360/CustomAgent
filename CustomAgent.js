@@ -21,13 +21,13 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['private'].AddMessage=function (sender, text, fields={}) {
 		let $this=_(this);
-		$this.SetValues({messages: [...$this.m_state.Messages, new Message({
-			id: `${sender}_${Date.now()}_${Math.random()}`
-			, sender
-			, text
-			, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+		$this.SetValues({messages: [...$this.m_state.Messages, {
+			Id: `${sender}_${Date.now()}_${Math.random()}`
+			, Sender: sender
+			, Text: text
+			, Timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
 			, ...fields
-		})]});
+		}]});
 	};
 
 	_['public'].Slots=['header', 'canvas', 'chat', 'overlay'];
@@ -411,7 +411,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			}
 
 			if (!(reply instanceof Error)) {
-				$this.Reply(reply, {includedMedia: $this.m_state.CurrentMedia});
+				$this.Reply(reply, {IncludedMedia: $this.m_state.CurrentMedia});
 				return;
 			}
 
@@ -444,7 +444,7 @@ App 事件：${event}
 			return;
 		}
 
-		this.Reply(reply, image?{includedMedia: image}:{});
+		this.Reply(reply, image?{IncludedMedia: image}:{});
 	};
 
 	_['private'].m_state=null;

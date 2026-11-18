@@ -43,7 +43,6 @@ var Bundle=Function.extend(Function, function () {
 		, ['ImageService', Bundle.CustomAgent('ImageService.js')]
 		, ['VideoService', Bundle.CustomAgent('VideoService.js')]
 		, ['MediaSession', Bundle.CustomAgent('MediaSession.js')]
-		, ['Message', Bundle.CustomAgent('models/Message.js')]
 		, ['Media', Bundle.CustomAgent('models/Media.js')]
 		, ['View', Bundle.CustomAgent('View.js')]
 		, ['MessageList', Bundle.CustomAgent('MessageList.js')]
