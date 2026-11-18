@@ -343,7 +343,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['private'].Instruction=function () {
-		return `你是 CustomAgent App 內的 Assistant。只回傳 JavaScript async 函式本體，不要 Markdown 程式碼區塊或 JSON 包裝。程式必須依目前使用者對話的語言回傳純字串；若只需回答文字，直接回傳字串。
+		return `你是 CustomAgent App 內的 Assistant。輸出可直接作為 JavaScript AsyncFunction 函式本體執行的原始碼。函式必須回傳依目前使用者對話語言撰寫的字串；單純回答文字時，直接回傳字串。
 函式本體收到 Executable、app、context、apply、source 參數，可用成員如下：
 - Executable.GetInstance(name)：取得已安裝的 Executable 實例，直接呼叫並 await 其 Run 方法。
 - context：實際的 {image, artifact} Media 物件實例；直接檢查類型與成員。
@@ -353,7 +353,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 - Executable.Sources：使用 ReadCompiledSource({file})、ReadRemoteSource({name})、ReadInstalledSource({name}) 讀取原碼。
 - app：目前的 CustomAgent 實例。使用 UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) 記錄已確認的修改、ResetConversation() 清除對話，影片請求使用 GenerateVideo(options, context)。只有使用者按下 Generate 才會開始影像生成。
 - Executable.Executions：本次工作階段先前產生的程式及其實際執行結果。
-所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error。禁止使用 throw、switch、操作名稱或 JSON 操作計畫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式碼不使用中文，但要向使用者顯示的文字依對話語言撰寫。修復失敗程式時，不要再次執行已完成的操作。`;
+所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error，並以 Helper.Error(error) 回傳錯誤。流程分派使用實際類型與方法呼叫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式識別字與註解使用英文；向使用者顯示的文字依對話語言撰寫。修復失敗程式時，根據已完成的操作接續執行剩餘部分。`;
 	};
 
 	_['private'].ApplyResult=async function (result) {
@@ -417,7 +417,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 			let previous=Executable.Executions.at(-1);
 			media=$this.m_state.CurrentMedia;
-			prompt+=`\n前一次程式執行失敗，原碼如下：\n${previous?.Code||''}\n實際已完成的操作：${JSON.stringify(previous?.Changes||[])}\n錯誤：${reply.message}\n目前已安裝執行類型：${Executable.GetNames().join(', ')}\n目前媒體：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。\n請撰寫修正後的程式，依照實際狀態繼續，不要重複已成功的副作用。`;
+			prompt+=`\n前一次程式執行失敗，原碼如下：\n${previous?.Code||''}\n實際已完成的操作：${JSON.stringify(previous?.Changes||[])}\n錯誤：${reply.message}\n目前已安裝執行類型：${Executable.GetNames().join(', ')}\n目前媒體：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。\n請依照實際狀態撰寫修正後的程式，接續執行剩餘操作。`;
 			if (attempt===2) {
 				$this.ReportError(reply);
 			}
