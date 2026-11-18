@@ -72,11 +72,10 @@ var ImageService=Function.extend(Object, function () {
 	};
 
 	_['public'].Capture=async function () {
-		let flow=Flow;
-		let photo=await flow.camera.capture({facingMode: 'user'});
+		let photo=await Flow.camera.capture({facingMode: 'user'});
 		if (!photo) { return null; }
 
-		let upload=await flow.upload({
+		let upload=await Flow.upload({
 			base64: photo.base64
 			, mimeType: 'image/png'
 			, name: 'Camera Capture '+new Date().toLocaleTimeString()
@@ -99,7 +98,6 @@ var ImageService=Function.extend(Object, function () {
 	};
 
 	_['public'].Generate=async function (prompt, image, ratio, index) {
-		let flow=Flow;
 		let mediaId=image?.MediaId;
 		let dimensions=image?await this.GetDimensions(image):null;
 		if (dimensions instanceof Error) { return dimensions; }
@@ -113,12 +111,12 @@ var ImageService=Function.extend(Object, function () {
 			let base64=await image.ToBase64();
 			if (base64 instanceof Error) { return base64; }
 
-			let upload=await flow.upload({base64, mimeType: image.MimeType, name: image.Title});
+			let upload=await Flow.upload({base64, mimeType: image.MimeType, name: image.Title});
 			mediaId=upload.mediaId;
 			image.MediaId=mediaId;
 		}
 
-		let result=await flow.generate.image({
+		let result=await Flow.generate.image({
 			prompt
 			, referenceImageMediaIds: mediaId?[mediaId]:undefined
 			, aspectRatio
