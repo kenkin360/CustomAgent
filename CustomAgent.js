@@ -424,7 +424,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		}
 	};
 
-	_['private'].Report=async function (event, details={}, image) {
+	_['private'].Report=async function (event, details, image) {
 		await _(this).m_ready;
 
 		let messages=this.GetState().Messages.slice(-8)
