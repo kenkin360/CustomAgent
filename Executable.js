@@ -2,11 +2,14 @@ var Executable=Function.extend(Object, function () {
 	var _=this(Executable);
 	Executable=_[Executable];
 
-	function Executable() {
+	function Executable(name, source) {
 		_['base'].apply(this, arguments);
+		this.Name=name;
+		this.Source=source;
 	}
 
 	_['public'].Name=null;
+	_['public'].Source=null;
 
 	_['public'].Run=async function () {
 		return Helper.Error('This executable has no Run method.');
@@ -35,25 +38,6 @@ var Executable=Function.extend(Object, function () {
 		return task;
 	}
 
-	Executable.Create=function (name, executableClass) {
-		if ('string'!==typeof name||!/^[A-Za-z_$][\w$]*$/.test(name)) {
-			return Helper.Error('Provide a valid executable name.');
-		}
-
-		if ('function'!==typeof executableClass||!(executableClass.prototype instanceof Executable)) {
-			return Helper.Error('Provide a class derived from Executable.');
-		}
-
-		try {
-			let instance=new executableClass();
-			instance.Name=name;
-			return instance;
-		}
-		catch (error) {
-			return Helper.Error(error);
-		}
-	};
-
 	Executable.GetInstance=function (name) {
 		return Executable.Instances.find((instance)=>instance.Name===name);
 	};
@@ -62,51 +46,18 @@ var Executable=Function.extend(Object, function () {
 		return Executable.Instances.map((instance)=>instance.Name);
 	};
 
-	Executable.Initialize=function (sourceFiles, hostSourceUrl, names) {
-		if (Executable.Shutdown) {
-			return Executable.Shutdown.then(()=>Executable.Initialize(sourceFiles, hostSourceUrl, names));
+	Executable.Load=async function (source, app) {
+		if (!(source instanceof Source)||!source.Remote) {
+			return Helper.Error('Provide a remote executable source.');
 		}
 
-		if (!Executable.Startup) {
-			Source.Initialize(sourceFiles, hostSourceUrl);
-			Executable.Startup=(async ()=>{
-				for (let name of names) {
-					if (Executable.GetInstance(name)) {
-						continue;
-					}
-
-					let source=Source.GetRemote(name);
-					if (!source) {
-						return Helper.Error('Executable source not found: '+name);
-					}
-
-					let executableClass=await new Resource.Module(name, source.Value);
-					let instance=Executable.Create(name, executableClass);
-					if (instance instanceof Error) {
-						return instance;
-					}
-
-					let result=await instance.Initialize();
-					if (result instanceof Error) {
-						return result;
-					}
-
-					Executable.Instances.push(instance);
-					Source.SetInstalled(name, source);
-				}
-			})().then((result)=>{
-				if (result instanceof Error) {
-					Executable.Startup=null;
-				}
-
-				return result;
-			}, (error)=>{
-				Executable.Startup=null;
-				return Helper.Error(error);
-			});
+		try {
+			let executableClass=await new Resource.Module(source.Name, source.Value, source.ReadyMember);
+			return await Executable.Install(source.Name, executableClass, source, app);
 		}
-
-		return Executable.Startup;
+		catch (error) {
+			return Helper.Error(error);
+		}
 	};
 
 	Executable.Remove=async function (instance, app) {
@@ -130,13 +81,27 @@ var Executable=Function.extend(Object, function () {
 
 	Executable.Install=function (name, executableClass, source, app) {
 		return Track((async ()=>{
-			let instance=Executable.Create(name, executableClass);
-			if (instance instanceof Error) {
-				return instance;
+			if ('string'!==typeof name||!/^[A-Za-z_$][\w$]*$/.test(name)) {
+				return Helper.Error('Provide a valid executable name.');
+			}
+
+			if ('function'!==typeof executableClass||!(executableClass.prototype instanceof Executable)) {
+				return Helper.Error('Provide a class derived from Executable.');
+			}
+
+			let instance;
+			try {
+				instance=new executableClass(name, source instanceof Source?source:new Source(name, source, undefined, false));
+			}
+			catch (error) {
+				return Helper.Error(error);
+			}
+
+			if (instance.Name!==name) {
+				return Helper.Error('The executable constructor must call its base constructor.');
 			}
 
 			let previous=Executable.GetInstance(name);
-			let previousSource=Source.GetInstalled(name);
 			if (previous) {
 				let error=await Executable.Remove(previous, app);
 				if (error) {
@@ -147,7 +112,6 @@ var Executable=Function.extend(Object, function () {
 			}
 
 			Executable.Instances.push(instance);
-			Source.SetInstalled(name, new Source(name, source, undefined, false));
 			let failure=null;
 			try {
 				let result=await instance.Initialize();
@@ -162,7 +126,6 @@ var Executable=Function.extend(Object, function () {
 			if (failure) {
 				await Executable.Remove(instance, app);
 				Executable.Instances.splice(Executable.Instances.indexOf(instance), 1);
-				Source.SetInstalled(name, previousSource);
 				if (previous) {
 					Executable.Instances.push(previous);
 					try {
@@ -179,7 +142,7 @@ var Executable=Function.extend(Object, function () {
 				return failure;
 			}
 
-			Executable.Versions.push({Name: name, Previous: previous, PreviousSource: previousSource, Current: instance});
+			Executable.Versions.push({Name: name, Previous: previous, Current: instance});
 			return instance;
 		})(), `Install ${name}`);
 	};
@@ -201,7 +164,6 @@ var Executable=Function.extend(Object, function () {
 				Executable.Instances.push(installation.Previous);
 			}
 
-			Source.SetInstalled(installation.Name, installation.PreviousSource);
 			Executable.Versions.pop();
 			if (installation.Previous) {
 				try {
@@ -232,7 +194,6 @@ var Executable=Function.extend(Object, function () {
 			}
 
 			Executable.Instances.splice(Executable.Instances.indexOf(instance), 1);
-			Source.SetInstalled(name, null);
 			Executable.Versions=Executable.Versions.filter((entry)=>entry.Name!==name);
 			return null;
 		})(), `Uninstall ${name}`);
@@ -265,40 +226,8 @@ var Executable=Function.extend(Object, function () {
 		return execution.Error||execution.Reply;
 	};
 
-	Executable.DisposeAll=function (app) {
-		if (!Executable.Shutdown) {
-			Executable.Shutdown=(async ()=>{
-				await Executable.Startup;
-				let instances=Executable.Instances;
-				Executable.Instances=[];
-				Executable.Versions=[];
-				Executable.Executions=[];
-				Executable.CurrentExecution=null;
-				Executable.Startup=null;
-				let failures=[];
-				for (let instance of instances) {
-					let error=await Executable.Remove(instance, app);
-					if (error) {
-						failures.push(error);
-					}
-				}
-
-				Source.Dispose();
-				Executable.Shutdown=null;
-				return failures[0]||null;
-			})().catch((error)=>{
-				Executable.Shutdown=null;
-				return Helper.Error(error);
-			});
-		}
-
-		return Executable.Shutdown;
-	};
-
 	Executable.Instances=[];
 	Executable.Versions=[];
 	Executable.Executions=[];
 	Executable.CurrentExecution=null;
-	Executable.Startup=null;
-	Executable.Shutdown=null;
 });

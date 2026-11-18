@@ -41,6 +41,76 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return _(this).m_state;
 	};
 
+	_['public'].ReadCompiledSource=function (args={}) {
+		let prefix='data:text/javascript;base64,';
+		let url=this.props.HostSourceUrl;
+		if (!url?.startsWith(prefix)) {
+			return Helper.Error('The bundled source is unavailable from import.meta.url.');
+		}
+
+		try {
+			let bytes=Uint8Array.from(atob(url.slice(prefix.length)), (char)=>char.charCodeAt(0));
+			let code=new TextDecoder().decode(bytes);
+			let markers=[...code.matchAll(/^\/\/ virtual:([^\r\n]+)\r?\n/gm)];
+			let files=[];
+			markers.forEach((marker, index)=>{
+				let start=marker.index+marker[0].length;
+				let end=index+1<markers.length?markers[index+1].index:code.length;
+				let name=marker[1].trim();
+				let value=code.slice(start, end).replace(/^\/\/ virtual-export:default [^\r\n]+\r?\n/, '');
+				let file=files.find((entry)=>entry.Name===name);
+				if (file) {
+					file.Value+=value;
+				}
+				else {
+					files.push({Name: name, Value: value});
+				}
+			});
+			if (!markers.length) {
+				files.push({Name: 'bundle', Value: code});
+			}
+			if ('string'!==typeof args.file) {
+				return {message: `Compiled source files: ${JSON.stringify(files.map((file)=>file.Name))}`};
+			}
+
+			let file=files.find((entry)=>entry.Name===args.file);
+			if (!file) {
+				return Helper.Error('Compiled source file not found: '+args.file);
+			}
+
+			return {message: `${file.Name}:\n${file.Value}`};
+		}
+		catch (error) {
+			return Helper.Error(error);
+		}
+	};
+
+	_['public'].ReadRemoteSource=function (args={}) {
+		if ('string'!==typeof args.name) {
+			return {message: `Remote source entries: ${JSON.stringify(Source.Instances.map((entry)=>({name: entry.Name, url: entry.Value, readyMember: entry.ReadyMember})))}`};
+		}
+
+		let source=Source.GetInstance(args.name);
+		if (!source) {
+			return Helper.Error('Remote source not found: '+args.name);
+		}
+
+		return source.Read();
+	};
+
+	_['public'].ReadInstalledSource=function (args={}) {
+		if ('string'!==typeof args.name) {
+			return {message: `Installed modules: ${JSON.stringify(Executable.GetNames())}`};
+		}
+
+		let instance=Executable.GetInstance(args.name);
+		if (!instance) {
+			return Helper.Error('Installed module not found: '+args.name);
+		}
+
+		return instance.Source.Read();
+	};
+
 	_['public'].GetImageInfo=async function () {
 		let $this=_(this);
 		let image=$this.m_state.ActiveMedia;
@@ -303,14 +373,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 			root.oninput=root.onkeydown=null;
 		}
 
-		Executable.DisposeAll($this).then((error)=>{
-			if (error) {
-				console.error(error);
-			}
-
-			$this.m_view.Dispose();
-			$this.m_listeners.clear();
-		}).catch((error)=>console.error(error));
+		$this.m_view.Dispose();
+		$this.m_listeners.clear();
 	};
 
 	_['public'].render=function () {
@@ -323,10 +387,19 @@ var CustomAgent=Function.extend(React.Component, function () {
 		await DisplayText.GetInstance(locale);
 		$this.Update();
 		$this.m_view.Node('app').SetStyle('visibility', 'visible');
-		let startup=await Executable.Initialize(this.props.SourceFiles, this.props.HostSourceUrl, ['DrawRectangle', 'Upscale']);
-		if (startup instanceof Error) {
-			$this.ReportError(startup);
-			return;
+		for (let [name, url, readyMember] of this.props.SourceFiles||[]) {
+			Source.GetInstance(name, url, readyMember);
+		}
+
+		for (let [name, path] of [['DrawRectangle', 'Executables/DrawRectangle.js'], ['Upscale', 'Executables/Upscale.js']]) {
+			let source=Source.GetInstance(name, Bundle.CustomAgent(path));
+			if (!Executable.GetInstance(name)) {
+				let loaded=await Executable.Load(source, this);
+				if (loaded instanceof Error) {
+					$this.ReportError(loaded);
+					return;
+				}
+			}
 		}
 
 		if ($this.m_state.Messages.length) {
@@ -348,9 +421,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 - Executable.GetInstance(name)：取得已安裝的 Executable 實例，直接呼叫並 await 其 Run 方法。
 - context：實際的 {image, artifact} Media 物件實例；直接檢查類型與成員。
 - await apply(result)：顯示執行結果中的影像或影片，並加入媒體歷史。
-- await Executable.Install(name, executableClass, source, app)：安裝在本函式本體中以 Function.extend(Executable, factory) 定義的類型。實例可定義 Dispose() 釋放監聽器、計時器等資源；以名稱掛載的畫面會自動移除。若 rollback 後需要重新建立資源，也應定義 Initialize()。
+- Source.GetInstance(name)：取得 CustomAgent 提供的遠端來源。可用來源先以 app.ReadRemoteSource() 查詢；清單包含一般應用程式碼，只有定義 Executable 衍生類型的來源能以 Executable.Load 載入。
+- await Executable.Load(Source.GetInstance(name), app)：執行期載入來源檔案中以 Function.extend(Executable, factory) 定義的類型，並安裝實例。需要使用尚未安裝的工具時，先查詢來源，再呼叫此方法。例如：let loaded=await Executable.Load(Source.GetInstance('Upscale'), app); if (loaded instanceof Error) { return loaded; } return 'Loaded';。內建工具啟動時也使用此方法。
+- await Executable.Install(name, executableClass, source, app)：安裝在本函式本體中以 Function.extend(Executable, factory) 定義的類型。類型的 constructor 須呼叫基底 constructor；實例可定義 Dispose() 釋放監聽器、計時器等資源；以名稱掛載的畫面會自動移除。若 rollback 後需要重新建立資源，也應定義 Initialize()。
 - await Executable.Rollback(app)：撤銷最近一次安裝。await Executable.Uninstall(name, app)：移除執行類型及其已安裝的原碼。
-- Source：使用 ReadCompiledSource({file})、ReadRemoteSource({name})、ReadInstalledSource({name}) 讀取原碼。
+- app.ReadCompiledSource({file})、app.ReadRemoteSource({name})、app.ReadInstalledSource({name})：查詢及讀取原碼。
 - app：目前的 CustomAgent 實例。使用 UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) 記錄已確認的修改、ResetConversation() 清除對話，影片請求使用 GenerateVideo(options, context)。只有使用者按下 Generate 才會開始影像生成。
 - Executable.Executions：本次工作階段先前產生的程式及其實際執行結果。
 所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error，並以 Helper.Error(error) 回傳錯誤。流程分派使用實際類型與方法呼叫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式識別字與註解使用英文；向使用者顯示的文字依對話語言撰寫。修復失敗程式時，根據已完成的操作接續執行剩餘部分。`;
@@ -397,7 +472,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 		let available=Executable.Instances.map((instance)=>`${instance.Name}: ${instance.Description||'no description'}`).join('\n');
 		let media=$this.m_state.CurrentMedia;
-		let prompt=`已安裝執行類型：\n${available||'(none)'}\n已編譯的原碼檔案：${JSON.stringify(Source.CompiledNames())}\n目前影像：${JSON.stringify(image)}\n目前媒體類型：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。\n選定比例：${state.SelectedRatio}\n已確認的修改：${JSON.stringify(state.AccumulatedChanges)}\n先前對話：\n${history}\n使用者目前的訊息：\n${message}`;
+		let compiled=$this.ReadCompiledSource();
+		let prompt=`已安裝執行類型：\n${available||'(none)'}\n可查閱來源：${JSON.stringify(Source.Instances.map((entry)=>entry.Name))}\n${compiled.message}\n目前影像：${JSON.stringify(image)}\n目前媒體類型：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。\n選定比例：${state.SelectedRatio}\n已確認的修改：${JSON.stringify(state.AccumulatedChanges)}\n先前對話：\n${history}\n使用者目前的訊息：\n${message}`;
 		let options={systemInstruction: $this.Instruction()};
 		if (image) {
 			let current=$this.m_state.ActiveMedia;
