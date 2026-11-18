@@ -41,13 +41,14 @@ var Source=Function.extend(Object, function () {
 
 	Source.SetMetaUrl=function (url) {
 		if (metaUrl!==null) {
-			return null;
+			return metaUrl;
 		}
 
 		metaUrl=url;
 		let prefix='data:text/javascript;base64,';
+
 		if (!url?.startsWith(prefix)) {
-			return Helper.Error('The bundled source is unavailable from import.meta.url.');
+			// return Helper.Error('The bundled source is unavailable from import.meta.url.');
 		}
 
 		try {
@@ -75,12 +76,12 @@ var Source=Function.extend(Object, function () {
 			for (let file of files) {
 				Source.Register(new Source(file.Name, file.Value, undefined, false));
 			}
-
-			return null;
 		}
 		catch (error) {
-			return Helper.Error(error);
+			// return Helper.Error(error);
 		}
+
+		return metaUrl;		
 	};
 
 	Source.GetInstance=function (name) {
