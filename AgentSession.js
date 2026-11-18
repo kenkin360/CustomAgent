@@ -1,8 +1,8 @@
-var MediaSession=Function.extend(Object, function () {
-	var _=this(MediaSession);
-	MediaSession=_[MediaSession];
+var AgentSession=Function.extend(Object, function () {
+	var _=this(AgentSession);
+	AgentSession=_[AgentSession];
 
-	function MediaSession() {
+	function AgentSession() {
 		_['base'].apply(this, arguments);
 		this.ActiveMedia=null;
 		this.CurrentMedia=null;
