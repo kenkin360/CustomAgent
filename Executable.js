@@ -62,20 +62,20 @@ var Executable=Function.extend(Object, function () {
 		return Executable.Instances.map((instance)=>instance.Name);
 	};
 
-	Executable.Initialize=function (sources, names) {
+	Executable.Initialize=function (sourceFiles, hostSourceUrl, names) {
 		if (Executable.Shutdown) {
-			return Executable.Shutdown.then(()=>Executable.Initialize(sources, names));
+			return Executable.Shutdown.then(()=>Executable.Initialize(sourceFiles, hostSourceUrl, names));
 		}
 
 		if (!Executable.Startup) {
-			Executable.Sources=sources;
+			Source.Initialize(sourceFiles, hostSourceUrl);
 			Executable.Startup=(async ()=>{
 				for (let name of names) {
 					if (Executable.GetInstance(name)) {
 						continue;
 					}
 
-					let source=sources.GetRemote(name);
+					let source=Source.GetRemote(name);
 					if (!source) {
 						return Helper.Error('Executable source not found: '+name);
 					}
@@ -92,7 +92,7 @@ var Executable=Function.extend(Object, function () {
 					}
 
 					Executable.Instances.push(instance);
-					sources.SetInstalled(name, source);
+					Source.SetInstalled(name, source);
 				}
 			})().then((result)=>{
 				if (result instanceof Error) {
@@ -136,7 +136,7 @@ var Executable=Function.extend(Object, function () {
 			}
 
 			let previous=Executable.GetInstance(name);
-			let previousSource=Executable.Sources.GetInstalled(name);
+			let previousSource=Source.GetInstalled(name);
 			if (previous) {
 				let error=await Executable.Remove(previous, app);
 				if (error) {
@@ -147,7 +147,7 @@ var Executable=Function.extend(Object, function () {
 			}
 
 			Executable.Instances.push(instance);
-			Executable.Sources.SetInstalled(name, new Source(name, source, undefined, false));
+			Source.SetInstalled(name, new Source(name, source, undefined, false));
 			let failure=null;
 			try {
 				let result=await instance.Initialize();
@@ -162,7 +162,7 @@ var Executable=Function.extend(Object, function () {
 			if (failure) {
 				await Executable.Remove(instance, app);
 				Executable.Instances.splice(Executable.Instances.indexOf(instance), 1);
-				Executable.Sources.SetInstalled(name, previousSource);
+				Source.SetInstalled(name, previousSource);
 				if (previous) {
 					Executable.Instances.push(previous);
 					try {
@@ -201,7 +201,7 @@ var Executable=Function.extend(Object, function () {
 				Executable.Instances.push(installation.Previous);
 			}
 
-			Executable.Sources.SetInstalled(installation.Name, installation.PreviousSource);
+			Source.SetInstalled(installation.Name, installation.PreviousSource);
 			Executable.Versions.pop();
 			if (installation.Previous) {
 				try {
@@ -232,7 +232,7 @@ var Executable=Function.extend(Object, function () {
 			}
 
 			Executable.Instances.splice(Executable.Instances.indexOf(instance), 1);
-			Executable.Sources.SetInstalled(name, null);
+			Source.SetInstalled(name, null);
 			Executable.Versions=Executable.Versions.filter((entry)=>entry.Name!==name);
 			return null;
 		})(), `Uninstall ${name}`);
@@ -274,7 +274,6 @@ var Executable=Function.extend(Object, function () {
 				Executable.Versions=[];
 				Executable.Executions=[];
 				Executable.CurrentExecution=null;
-				Executable.Sources=null;
 				Executable.Startup=null;
 				let failures=[];
 				for (let instance of instances) {
@@ -284,6 +283,7 @@ var Executable=Function.extend(Object, function () {
 					}
 				}
 
+				Source.Dispose();
 				Executable.Shutdown=null;
 				return failures[0]||null;
 			})().catch((error)=>{
@@ -299,7 +299,6 @@ var Executable=Function.extend(Object, function () {
 	Executable.Versions=[];
 	Executable.Executions=[];
 	Executable.CurrentExecution=null;
-	Executable.Sources=null;
 	Executable.Startup=null;
 	Executable.Shutdown=null;
 });
