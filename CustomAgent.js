@@ -19,7 +19,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		this.Notify();
 	};
 
-	_['private'].AddMessage=function (sender, text, fields={}) {
+	_['private'].AddMessage=function (sender, text, fields) {
 		let $this=_(this);
 		$this.SetValues({messages: [...$this.m_state.Messages, {
 			Id: `${sender}_${Date.now()}_${Math.random()}`
@@ -41,71 +41,40 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return _(this).m_state;
 	};
 
-	_['public'].ReadCompiledSource=function (args={}) {
-		let prefix='data:text/javascript;base64,';
-		let url=this.props.HostSourceUrl;
-		if (!url?.startsWith(prefix)) {
-			return Helper.Error('The bundled source is unavailable from import.meta.url.');
-		}
-
-		try {
-			let bytes=Uint8Array.from(atob(url.slice(prefix.length)), (char)=>char.charCodeAt(0));
-			let code=new TextDecoder().decode(bytes);
-			let markers=[...code.matchAll(/^\/\/ virtual:([^\r\n]+)\r?\n/gm)];
-			let files=[];
-			markers.forEach((marker, index)=>{
-				let start=marker.index+marker[0].length;
-				let end=index+1<markers.length?markers[index+1].index:code.length;
-				let name=marker[1].trim();
-				let value=code.slice(start, end).replace(/^\/\/ virtual-export:default [^\r\n]+\r?\n/, '');
-				let file=files.find((entry)=>entry.Name===name);
-				if (file) {
-					file.Value+=value;
-				}
-				else {
-					files.push({Name: name, Value: value});
-				}
-			});
-			if (!markers.length) {
-				files.push({Name: 'bundle', Value: code});
-			}
-			if ('string'!==typeof args.file) {
-				return {message: `Compiled source files: ${JSON.stringify(files.map((file)=>file.Name))}`};
-			}
-
-			let file=files.find((entry)=>entry.Name===args.file);
-			if (!file) {
-				return Helper.Error('Compiled source file not found: '+args.file);
-			}
-
-			return {message: `${file.Name}:\n${file.Value}`};
-		}
-		catch (error) {
-			return Helper.Error(error);
-		}
+	_['public'].ListCompiledSources=function () {
+		return {message: `Compiled source files: ${JSON.stringify(Source.Instances.filter((entry)=>!entry.Remote).map((entry)=>entry.Name))}`};
 	};
 
-	_['public'].ReadRemoteSource=function (args={}) {
-		if ('string'!==typeof args.name) {
-			return {message: `Remote source entries: ${JSON.stringify(Source.Instances.map((entry)=>({name: entry.Name, url: entry.Value, readyMember: entry.ReadyMember})))}`};
+	_['public'].ReadCompiledSource=function (file) {
+		let source=Source.GetInstance(file);
+		if (!source||source.Remote) {
+			return Helper.Error('Compiled source file not found: '+file);
 		}
 
-		let source=Source.GetInstance(args.name);
-		if (!source) {
-			return Helper.Error('Remote source not found: '+args.name);
+		return {message: `${source.Name}:\n${source.Value}`};
+	};
+
+	_['public'].ListRemoteSources=function () {
+		return {message: `Remote source entries: ${JSON.stringify(Source.Instances.filter((entry)=>entry.Remote).map((entry)=>({name: entry.Name, url: entry.Value, readyMember: entry.ReadyMember})))}`};
+	};
+
+	_['public'].ReadRemoteSource=function (name) {
+		let source=Source.GetInstance(name);
+		if (!source||!source.Remote) {
+			return Helper.Error('Remote source not found: '+name);
 		}
 
 		return source.Read();
 	};
 
-	_['public'].ReadInstalledSource=function (args={}) {
-		if ('string'!==typeof args.name) {
-			return {message: `Installed modules: ${JSON.stringify(Executable.GetNames())}`};
-		}
+	_['public'].ListInstalledSources=function () {
+		return {message: `Installed modules: ${JSON.stringify(Executable.GetNames())}`};
+	};
 
-		let instance=Executable.GetInstance(args.name);
+	_['public'].ReadInstalledSource=function (name) {
+		let instance=Executable.GetInstance(name);
 		if (!instance) {
-			return Helper.Error('Installed module not found: '+args.name);
+			return Helper.Error('Installed module not found: '+name);
 		}
 
 		return instance.Source.Read();
@@ -122,7 +91,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return {...dimensions, mimeType: image.MimeType, title: image.Title};
 	};
 
-	_['public'].Reply=function (text, fields={}) {
+	_['public'].Reply=function (text, fields) {
 		_(this).AddMessage('agent', text, fields);
 	};
 
@@ -193,7 +162,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.SetValues({isConsulting: false});
 	};
 
-	_['public'].GenerateVideo=async function (args={}, context={}) {
+	_['public'].GenerateVideo=async function (args, context) {
 		let artifact=await new VideoService().Generate(args, context);
 
 		if (artifact instanceof Error) {
@@ -265,7 +234,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			globalThis.addEventListener('unhandledrejection', (event)=>capture(event, event.reason), {signal: $this.m_errorEvents.signal});
 		}
 
-		$this.m_ready=$this.Welcome().catch((error)=>{
+		$this.m_ready=$this.Initialize().catch((error)=>{
 			$this.m_view.Node('app').SetStyle('visibility', 'visible');
 			$this.ReportError(error);
 		});
@@ -381,17 +350,23 @@ var CustomAgent=Function.extend(React.Component, function () {
 		return React.createElement('div', {ref: (element)=>_(this).m_view.SetRoot(element), style: {height: '100%', width: '100%'}, dangerouslySetInnerHTML: {__html: agentTemplate}});
 	};
 
-	_['private'].Welcome=async function () {
+	_['private'].Initialize=async function () {
 		let $this=_(this);
+		let error=Source.SetMetaUrl(this.props.HostSourceUrl);
+		if (error instanceof Error) {
+			$this.ReportError(error);
+			return;
+		}
+
 		await DisplayText.GetInstance(($this.m_view).GetLocale());
 		$this.Update();
 		$this.m_view.Node('app').SetStyle('visibility', 'visible');
 		for (let [name, url, readyMember] of this.props.SourceFiles||[]) {
-			Source.GetInstance(name, url, readyMember);
+			Source.Register(new Source(name, url, readyMember));
 		}
 
 		for (let [name, path] of [['DrawRectangle', 'Executables/DrawRectangle.js'], ['Upscale', 'Executables/Upscale.js']]) {
-			let source=Source.GetInstance(name, Bundle.CustomAgent(path));
+			let source=Source.Register(new Source(name, Bundle.CustomAgent(path)));
 			if (!Executable.GetInstance(name)) {
 				let loaded=await Executable.Load(source, this);
 				if (loaded instanceof Error) {
@@ -424,11 +399,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 - Executable.GetInstance(name)：取得已安裝的 Executable 實例，直接呼叫並 await 其 Run 方法。
 - context：實際的 {image, artifact} Media 物件實例；直接檢查類型與成員。
 - await apply(result)：顯示執行結果中的影像或影片，並加入媒體歷史。
-- Source.GetInstance(name)：取得 CustomAgent 提供的遠端來源。可用來源先以 app.ReadRemoteSource() 查詢；清單包含一般應用程式碼，只有定義 Executable 衍生類型的來源能以 Executable.Load 載入。
+- Source.GetInstance(name)：取得 CustomAgent 提供的來源。可用遠端來源先以 app.ListRemoteSources() 查詢；清單包含一般應用程式碼，只有定義 Executable 衍生類型的來源能以 Executable.Load 載入。
 - await Executable.Load(Source.GetInstance(name), app)：執行期載入來源檔案中以 Function.extend(Executable, factory) 定義的類型，並安裝實例。需要使用尚未安裝的工具時，先查詢來源，再呼叫此方法。例如：let loaded=await Executable.Load(Source.GetInstance('Upscale'), app); if (loaded instanceof Error) { return loaded; } return 'Loaded';。內建工具啟動時也使用此方法。
 - await Executable.Install(name, executableClass, source, app)：安裝在本函式本體中以 Function.extend(Executable, factory) 定義的類型。類型的 constructor 須呼叫基底 constructor；實例可定義 Dispose() 釋放監聽器、計時器等資源；以名稱掛載的畫面會自動移除。若 rollback 後需要重新建立資源，也應定義 Initialize()。
 - await Executable.Rollback(app)：撤銷最近一次安裝。await Executable.Uninstall(name, app)：移除執行類型及其已安裝的原碼。
-- app.ReadCompiledSource({file})、app.ReadRemoteSource({name})、app.ReadInstalledSource({name})：查詢及讀取原碼。
+- app.ListCompiledSources()、app.ListRemoteSources()、app.ListInstalledSources()：分別列出可查閱的原碼。
+- app.ReadCompiledSource(file)、app.ReadRemoteSource(name)、app.ReadInstalledSource(name)：讀取指定原碼。
 - app：目前的 CustomAgent 實例。使用 UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) 記錄已確認的修改、ResetConversation() 清除對話，影片請求使用 GenerateVideo(options, context)。只有使用者按下 Generate 才會開始影像生成。
 - Executable.Executions：本次工作階段先前產生的程式及其實際執行結果。
 所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error，並以 Helper.Error(error) 回傳錯誤。流程分派使用實際類型與方法呼叫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式識別字與註解使用英文；向使用者顯示的文字依對話語言撰寫。修復失敗程式時，根據已完成的操作接續執行剩餘部分。
@@ -482,7 +458,7 @@ ${Executable.GetNames().join('\r\n')}
 
 		let available=Executable.Instances.map((instance)=>`${instance.Name}: ${instance.Description||'no description'}`).join('\n');
 		let media=$this.m_state.CurrentMedia;
-		let compiled=$this.ReadCompiledSource();
+		let compiled=$this.ListCompiledSources();
 		let prompt=`已安裝執行類型：\n${available||'(none)'}\n可查閱來源：${JSON.stringify(Source.Instances.map((entry)=>entry.Name))}\n${compiled.message}\n目前影像：${JSON.stringify(image)}\n目前媒體類型：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。\n選定比例：${state.SelectedRatio}\n已確認的修改：${JSON.stringify(state.AccumulatedChanges)}\n先前對話：\n${history}\n使用者目前的訊息：\n${message}`;
 		let options={systemInstruction: $this.Instruction()};
 		if (image) {

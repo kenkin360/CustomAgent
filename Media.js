@@ -2,7 +2,7 @@ var Media=Function.extend(Object, function () {
 	var _=this(Media);
 	Media=_[Media];
 
-	function Media(value={}) {
+	function Media(value) {
 		_['base'].apply(this, arguments);
 		this.Id=value.Id||value.id||'media_'+Date.now()+'_'+Math.random().toString(36).slice(2);
 		this.MimeType=value.MimeType||value.mimeType||'application/octet-stream';
@@ -59,7 +59,7 @@ var Media=Function.extend(Object, function () {
 	var Image=Function.extend(Media, function () {
 		var _=this(Image);
 		Image=_[Image];
-		function Image(value={}) {
+		function Image(value) {
 			_['base'].apply(this, arguments);
 			this.Width=value.Width||value.width||null;
 			this.Height=value.Height||value.height||null;
@@ -72,7 +72,7 @@ var Media=Function.extend(Object, function () {
 	var Video=Function.extend(Media, function () {
 		var _=this(Video);
 		Video=_[Video];
-		function Video(value={}) {
+		function Video(value) {
 			_['base'].apply(this, arguments);
 			this.DurationSeconds=value.DurationSeconds||value.durationSeconds||null;
 			this.Resolution=value.Resolution||value.resolution||null;

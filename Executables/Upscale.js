@@ -33,7 +33,7 @@ var Upscale=Function.extend(Executable, function () {
 		catch (error) { $this.m_weights=null; return Helper.Error(error); }
 	};
 
-	_['public'].Run=async function (args={}, {image}) {
+	_['public'].Run=async function (args, {image}) {
 		if (!(image instanceof Media.Image)||!image.Data) { return Helper.Error('Load an image first.'); }
 
 		let width=args.width;
