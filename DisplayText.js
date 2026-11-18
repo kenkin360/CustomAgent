@@ -19,7 +19,11 @@ var DisplayText=Function.extend(Promise, function () {
 				return;
 			}
 
-			Flow.generate.text(`請保持以下字典的所有 key，將每個 value 翻譯為 ${locale} 語系，並只回傳可供 JSON.parse 直接解析的 JSON 物件文字。\n${JSON.stringify(DisplayText.Default.Entries)}`).then((result)=>{
+			Flow.generate.text(`
+請保持以下字典的所有 key，將每個 value 翻譯為 ${locale} 語系
+並只回傳可供 JSON.parse 直接解析的 JSON 物件文字
+${JSON.stringify((DisplayText.Default).Entries)}
+`).then(result => {
 				this.Entries=JSON.parse(result.text);
 				resolve(this.Entries);
 			}).catch((error)=>{
@@ -59,7 +63,8 @@ var DisplayText=Function.extend(Promise, function () {
 	_['public'].Locale=null;
 
 	DisplayText.GetInstance=function (locale) {
-		let instance=DisplayText.Instances.find((value)=>value.Locale===locale);
+		let instance=(DisplayText.Instances).find(value => value.Locale===locale);
+
 		if (!instance) {
 			instance=new DisplayText(locale);
 			DisplayText.Instances.push(instance);
