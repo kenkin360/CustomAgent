@@ -365,6 +365,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 			Source.Register(new Source(name, url, readyMember));
 		}
 
+		Source.Register(new Source('Function.extend.README.md', Bundle.CustomAgent('Function.extend.README.md')));
+
 		for (let [name, path] of [['DrawRectangle', 'Executables/DrawRectangle.js'], ['Upscale', 'Executables/Upscale.js']]) {
 			let source=Source.Register(new Source(name, Bundle.CustomAgent(path)));
 			if (!Executable.GetInstance(name)) {
@@ -405,6 +407,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 - await Executable.Rollback(app)：撤銷最近一次安裝。await Executable.Uninstall(name, app)：移除執行類型及其已安裝的原碼。
 - app.ListCompiledSources()、app.ListRemoteSources()、app.ListInstalledSources()：分別列出可查閱的原碼。
 - app.ReadCompiledSource(file)、app.ReadRemoteSource(name)、app.ReadInstalledSource(name)：取得指定原碼字串；後兩者須 await。
+- Function.extend.README.md：Function.extend 類別寫法參考；需要撰寫或修改類別時，可用 await app.ReadRemoteSource('Function.extend.README.md') 查閱。
 - app：目前的 CustomAgent 實例。使用 UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) 記錄已確認的修改、ResetConversation() 清除對話，影片請求使用 GenerateVideo(options, context)。只有使用者按下 Generate 才會開始影像生成。
 - Executable.Executions：本次工作階段先前產生的程式及其實際執行結果。
 所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error，並以 Helper.Error(error) 回傳錯誤。流程分派使用實際類型與方法呼叫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式識別字與註解使用英文；向使用者顯示的文字依對話語言撰寫。修復失敗程式時，根據已完成的操作接續執行剩餘部分。
