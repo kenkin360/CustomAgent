@@ -383,7 +383,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['private'].Welcome=async function () {
 		let $this=_(this);
-		await DisplayText.GetInstance(locale);
+		await DisplayText.GetInstance(($this.m_view).GetLocale());
 		$this.Update();
 		$this.m_view.Node('app').SetStyle('visibility', 'visible');
 		for (let [name, url, readyMember] of this.props.SourceFiles||[]) {
