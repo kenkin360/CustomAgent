@@ -7,7 +7,7 @@ var Message=Function.extend(Object, function () {
 		this.Sender=value.Sender||value.sender;
 		this.Text=value.Text||value.text;
 		this.Timestamp=value.Timestamp||value.timestamp;
-		this.IncludedMedia=Media.From(value.IncludedMedia||value.includedMedia);
+		this.IncludedMedia=value.IncludedMedia||value.includedMedia;
 		this.SuggestedPrompt=value.SuggestedPrompt||value.suggestedPrompt;
 	}
 
