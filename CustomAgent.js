@@ -36,7 +36,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 					return;
 				}
 
-				Flow.generate.text(`Translate every value into the ${locale} locale. Preserve all keys. Return only a JSON object that JSON.parse can read directly.\n${JSON.stringify(DisplayText.Default.Entries)}`).then((result)=>{
+				Flow.generate.text(`請保持以下字典的所有 key，將每個 value 翻譯為 ${locale} 語系，並只回傳可供 JSON.parse 直接解析的 JSON 物件文字。\n${JSON.stringify(DisplayText.Default.Entries)}`).then((result)=>{
 					this.Entries=JSON.parse(result.text);
 					resolve(this.Entries);
 				}).catch((error)=>{
@@ -428,7 +428,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			return;
 		}
 
-		let reply=await $this.InvokeText(`Welcome the user briefly. Browser locale: ${locale}. Available modules: ${$this.m_modules.GetNames().join(', ')}.`, {systemInstruction: $this.Instruction()});
+		let reply=await $this.InvokeText(`你是否了解自己的能力？請簡短歡迎使用者。瀏覽器語系：${locale}。可用模組：${$this.m_modules.GetNames().join(', ')}。`, {systemInstruction: $this.Instruction()});
 		if (reply instanceof Error) {
 			$this.ReportError(reply);
 		}
@@ -438,17 +438,17 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['private'].Instruction=function () {
-		return `You are the assistant inside CustomAgent. Return only a JavaScript async function body, without Markdown fences or JSON packaging. Your code must return a plain string in the language of the current user conversation. For a text-only answer, return a string directly.
-The body receives "modules". Available members:
-- modules.Runtime: installed classes by name. Call their static Run methods directly and await them.
-- modules.Context: the actual {image, artifact} Media instances. Inspect their types and members directly.
-- await modules.Apply(result): display an image or video produced by a module and add it to media history.
-- await modules.Install(name, Type): install a class defined in this function body. A class may define static Dispose() to release listeners, timers, and other resources. UI mounted under its module name is removed automatically. Classes with resources that must be restored after rollback should also define static Initialize(); call it after the initial installation.
-- await modules.Rollback(): undo the latest installation. await modules.Uninstall(name): remove a module and its installed source.
-- modules.Sources: read source files with ReadCompiledSource({file}), ReadRemoteSource({name}), and ReadInstalledSource({name}).
-- modules.UI: the current agent. Use UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) for confirmed edits, ResetConversation() to clear conversation, and GenerateVideo(options, modules.Context) for video requests. Image generation only starts when the user presses Generate.
-- modules.Executions: previous generated programs and their actual results for this session.
-Await all asynchronous work, including concurrent work through Promise.all. Check Error return values from APIs. Never use throw, switch, action names, or JSON action plans. Use tabs, C# style names, braces for every if, and no spaces around operators. Avoid Chinese in code except text intended for the user's conversation. Do not run an already completed operation again when repairing a failed program.`;
+		return `你是 CustomAgent App 內的 Assistant。只回傳 JavaScript async 函式本體，不要 Markdown 程式碼區塊或 JSON 包裝。程式必須依目前使用者對話的語言回傳純字串；若只需回答文字，直接回傳字串。
+函式本體收到 modules 參數，可用成員如下：
+- modules.Runtime：依名稱取得已安裝的類型；直接呼叫並 await 其靜態 Run 方法。
+- modules.Context：實際的 {image, artifact} Media 物件實例；直接檢查類型與成員。
+- await modules.Apply(result)：顯示模組產出的影像或影片，並加入媒體歷史。
+- await modules.Install(name, Type)：安裝在本函式本體中定義的類型。類型可定義靜態 Dispose() 釋放監聽器、計時器等資源；以模組名稱掛載的 UI 會自動移除。若類型的資源在 rollback 後需要重新建立，也應定義靜態 Initialize()，並在首次安裝後呼叫。
+- await modules.Rollback()：撤銷最近一次安裝。await modules.Uninstall(name)：移除模組及其已安裝的原碼。
+- modules.Sources：使用 ReadCompiledSource({file})、ReadRemoteSource({name})、ReadInstalledSource({name}) 讀取原碼。
+- modules.UI：目前的 App。使用 UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) 記錄已確認的修改、ResetConversation() 清除對話，影片請求使用 GenerateVideo(options, modules.Context)。只有使用者按下 Generate 才會開始影像生成。
+- modules.Executions：本次工作階段先前產生的程式及其實際執行結果。
+所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error。禁止使用 throw、switch、操作名稱或 JSON 操作計畫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式碼不使用中文，但要向使用者顯示的文字依對話語言撰寫。修復失敗程式時，不要再次執行已完成的操作。`;
 	};
 
 	_['private'].ApplyResult=async function (result) {
@@ -570,7 +570,7 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 
 		let available=Object.entries($this.m_modules.GetRuntime().Modules).map(([name, Type])=>`${name}: ${Type.Run?.Description||'no description'}`).join('\n');
 		let media=$this.m_state.CurrentMedia;
-		let prompt=`Installed modules:\n${available||'(none)'}\nCompiled source files: ${JSON.stringify($this.m_modules.GetSources().CompiledNames())}\nCurrent image: ${JSON.stringify(image)}\nCurrent media type: ${media?.constructor.name||'none'}; fields: ${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}. Access the instance through modules.Context.artifact.\nSelected ratio: ${state.SelectedRatio}\nConfirmed changes: ${JSON.stringify(state.AccumulatedChanges)}\nPrevious conversation:\n${history}\nCurrent user message:\n${message}`;
+		let prompt=`已安裝模組：\n${available||'(none)'}\n已編譯的原碼檔案：${JSON.stringify($this.m_modules.GetSources().CompiledNames())}\n目前影像：${JSON.stringify(image)}\n目前媒體類型：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 modules.Context.artifact 存取物件實例。\n選定比例：${state.SelectedRatio}\n已確認的修改：${JSON.stringify(state.AccumulatedChanges)}\n先前對話：\n${history}\n使用者目前的訊息：\n${message}`;
 		let options={systemInstruction: $this.Instruction()};
 		if (image) {
 			let current=$this.m_state.ActiveMedia;
@@ -590,7 +590,7 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 
 			let previous=$this.m_executions.at(-1);
 			media=$this.m_state.CurrentMedia;
-			prompt+=`\nThe previous program failed. Its source was:\n${previous?.Code||''}\nActual completed operations: ${JSON.stringify(previous?.Changes||[])}\nError: ${reply.message}\nInstalled modules now: ${$this.m_modules.GetNames().join(', ')}\nCurrent media now: ${media?.constructor.name||'none'}; fields: ${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}. Access the instance through modules.Context.artifact.\nWrite a corrected program. Continue from actual state; do not repeat successful side effects.`;
+			prompt+=`\n前一次程式執行失敗，原碼如下：\n${previous?.Code||''}\n實際已完成的操作：${JSON.stringify(previous?.Changes||[])}\n錯誤：${reply.message}\n目前已安裝模組：${$this.m_modules.GetNames().join(', ')}\n目前媒體：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 modules.Context.artifact 存取物件實例。\n請撰寫修正後的程式，依照實際狀態繼續，不要重複已成功的副作用。`;
 			if (attempt===2) {
 				$this.ReportError(reply);
 			}
@@ -605,11 +605,11 @@ Await all asynchronous work, including concurrent work through Promise.all. Chec
 			.join('\n');
 
 		let prompt=`
-Recent conversation:
+最近的對話：
 ${messages}
-App event: ${event}
-Actual result: ${JSON.stringify(details)}
-Reply briefly to the user in the language of the current conversation.
+App 事件：${event}
+實際結果：${JSON.stringify(details)}
+根據 App 回報的結果，依使用者當前對話語言簡短回覆。
 `;
 		let reply=await _(this).InvokeText(prompt, {systemInstruction: _(this).Instruction()});
 		if (reply instanceof Error) {
