@@ -398,7 +398,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 輸出可直接作為 JavaScript AsyncFunction 函式本體執行的原始碼。
 函式必須回傳依目前使用者對話語言撰寫的字串；單純回答文字時，直接回傳字串。
 函式本體收到 Executable、app、context、run、apply、source 參數，可用成員如下：
-- await run(name, args)：執行已安裝的 Executable，會自動傳入目前的 {image, artifact} 物件；例如 await run('Upscale', {width: 1536, height: 2752})。檢查回傳的 Error，影像結果再以 await apply(result) 顯示。
+- await run(name, args)：執行已安裝的 Executable，會自動傳入目前的 {image, artifact} 物件。檢查回傳的 Error，媒體結果再以 await apply(result) 顯示。
 - context：實際的 {image, artifact} Media 物件實例；直接檢查類型與成員。
 - await apply(result)：顯示執行結果中的影像或影片，並加入媒體歷史。
 - Source.GetInstance(name)：取得 CustomAgent 提供的來源。可用遠端來源先以 app.ListRemoteSources() 查詢；清單包含一般應用程式碼，只有定義 Executable 衍生類型的來源能以 Executable.Load 載入。
