@@ -6,7 +6,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		_['base'].apply(this, arguments);
 		let $this=_(this);
 		$this.m_view=new View();
-		$this.m_state=new AgentState();
+		$this.m_state=new MediaSession();
 		$this.m_listeners=new Set();
 		$this.m_activeTurn=null;
 		$this.m_ready=null;
@@ -14,7 +14,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	}
 	
 	_['private'].SetValues=function (patch) {
-		this.m_state.Apply(patch);
+		this.m_state.Update(patch);
 		this.Update();
 		this.Notify();
 	};

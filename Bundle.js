@@ -42,7 +42,6 @@ var Bundle=Function.extend(Function, function () {
 		, ['HtmlNode', 'https://esm.sh/gh/kenkin360/FlowerX/HtmlNode.js?raw']
 		, ['ImageService', Bundle.CustomAgent('ImageService.js')]
 		, ['VideoService', Bundle.CustomAgent('VideoService.js')]
-		, ['AgentState', Bundle.CustomAgent('models/AgentState.js')]
 		, ['MediaSession', Bundle.CustomAgent('MediaSession.js')]
 		, ['Message', Bundle.CustomAgent('models/Message.js')]
 		, ['Media', Bundle.CustomAgent('models/Media.js')]
