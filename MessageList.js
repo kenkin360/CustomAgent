@@ -15,6 +15,10 @@ var MessageList=Function.extend(Object, function () {
 
 		if (state.Messages===$this.m_lastMessages&&state.IsConsulting===$this.m_lastConsulting&&list===$this.m_lastNode) { return; }
 
+		let scroll=()=>{
+			list.parentElement.scrollTop=list.parentElement.scrollHeight;
+		};
+
 		let items=state.Messages.map((message)=>{
 			let item=document.createElement('div');
 			item.className=`ca-message ca-${message.Sender}`;
@@ -27,6 +31,10 @@ var MessageList=Function.extend(Object, function () {
 					preview.controls=true;
 					preview.playsInline=true;
 					preview.preload='metadata';
+					preview.onloadedmetadata=scroll;
+				}
+				else {
+					preview.onload=scroll;
 				}
 
 				preview.src=url(message.IncludedMedia);
@@ -66,7 +74,7 @@ var MessageList=Function.extend(Object, function () {
 		$this.m_lastMessages=state.Messages;
 		$this.m_lastNode=list;
 		$this.m_lastConsulting=state.IsConsulting;
-		(list.querySelector('.ca-thinking')||list.lastElementChild)?.scrollIntoView({block: 'nearest'});
+		scroll();
 	};
 
 	_['private'].m_lastMessages=null;
