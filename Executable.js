@@ -205,8 +205,15 @@ var Executable=Function.extend(Object, function () {
 		Executable.CurrentExecution=execution;
 		try {
 			let AsyncFunction=(async function () {}).constructor;
-			let Run=new AsyncFunction('Executable', 'app', 'context', 'apply', 'source', code+'\n//# sourceURL=CustomAgentGenerated.js');
-			execution.Reply=await Run(Executable, app, context, (result)=>Track(apply(result), 'Apply media'), code);
+			let Run=new AsyncFunction('Executable', 'app', 'context', 'run', 'apply', 'source', code+'\n//# sourceURL=CustomAgentGenerated.js');
+			execution.Reply=await Run(Executable, app, context, (name, args)=>Track((async ()=>{
+				let instance=Executable.GetInstance(name);
+				if (!instance) {
+					return Helper.Error('Executable is not installed: '+name);
+				}
+
+				return instance.Run(args, context);
+			})(), `Run ${name}`), (result)=>Track(apply(result), 'Apply media'), code);
 		}
 		catch (error) {
 			execution.Error=error instanceof Error?error:Helper.Error(error);
