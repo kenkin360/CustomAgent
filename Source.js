@@ -20,7 +20,7 @@ var Source=Function.extend(Object, function () {
 	_['public'].Read=async function () {
 		let $this=_(this);
 		if ($this.m_content!==null) {
-			return {message: `${this.Name}:\n${$this.m_content}`};
+			return `${this.Name}:\n${$this.m_content}`;
 		}
 
 		try {
@@ -30,7 +30,7 @@ var Source=Function.extend(Object, function () {
 			}
 
 			$this.m_content=await response.text();
-			return {message: `${this.Name}:\n${$this.m_content}`};
+		return `${this.Name}:\n${$this.m_content}`;
 		}
 		catch (error) {
 			return Helper.Error(error);

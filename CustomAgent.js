@@ -42,7 +42,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].ListCompiledSources=function () {
-		return {message: `Compiled source files: ${JSON.stringify(Source.Instances.filter((entry)=>!entry.Remote).map((entry)=>entry.Name))}`};
+		return `Compiled source files: ${JSON.stringify(Source.Instances.filter((entry)=>!entry.Remote).map((entry)=>entry.Name))}`;
 	};
 
 	_['public'].ReadCompiledSource=function (file) {
@@ -51,11 +51,11 @@ var CustomAgent=Function.extend(React.Component, function () {
 			return Helper.Error('Compiled source file not found: '+file);
 		}
 
-		return {message: `${source.Name}:\n${source.Value}`};
+		return `${source.Name}:\n${source.Value}`;
 	};
 
 	_['public'].ListRemoteSources=function () {
-		return {message: `Remote source entries: ${JSON.stringify(Source.Instances.filter((entry)=>entry.Remote).map((entry)=>({name: entry.Name, url: entry.Value, readyMember: entry.ReadyMember})))}`};
+		return `Remote source entries: ${JSON.stringify(Source.Instances.filter((entry)=>entry.Remote).map((entry)=>({name: entry.Name, url: entry.Value, readyMember: entry.ReadyMember})))}`;
 	};
 
 	_['public'].ReadRemoteSource=function (name) {
@@ -68,7 +68,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].ListInstalledSources=function () {
-		return {message: `Installed modules: ${JSON.stringify(Executable.GetNames())}`};
+		return `Installed modules: ${JSON.stringify(Executable.GetNames())}`;
 	};
 
 	_['public'].ReadInstalledSource=function (name) {
@@ -404,7 +404,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 - await Executable.Install(name, executableClass, source, app)：安裝在本函式本體中以 Function.extend(Executable, factory) 定義的類型。類型的 constructor 須呼叫基底 constructor；實例可定義 Dispose() 釋放監聽器、計時器等資源；以名稱掛載的畫面會自動移除。若 rollback 後需要重新建立資源，也應定義 Initialize()。
 - await Executable.Rollback(app)：撤銷最近一次安裝。await Executable.Uninstall(name, app)：移除執行類型及其已安裝的原碼。
 - app.ListCompiledSources()、app.ListRemoteSources()、app.ListInstalledSources()：分別列出可查閱的原碼。
-- app.ReadCompiledSource(file)、app.ReadRemoteSource(name)、app.ReadInstalledSource(name)：讀取指定原碼。
+- app.ReadCompiledSource(file)、app.ReadRemoteSource(name)、app.ReadInstalledSource(name)：取得指定原碼字串；後兩者須 await。
 - app：目前的 CustomAgent 實例。使用 UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) 記錄已確認的修改、ResetConversation() 清除對話，影片請求使用 GenerateVideo(options, context)。只有使用者按下 Generate 才會開始影像生成。
 - Executable.Executions：本次工作階段先前產生的程式及其實際執行結果。
 所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error，並以 Helper.Error(error) 回傳錯誤。流程分派使用實際類型與方法呼叫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式識別字與註解使用英文；向使用者顯示的文字依對話語言撰寫。修復失敗程式時，根據已完成的操作接續執行剩餘部分。
@@ -459,7 +459,7 @@ ${Executable.GetNames().join('\r\n')}
 		let available=Executable.Instances.map((instance)=>`${instance.Name}: ${instance.Description||'no description'}`).join('\n');
 		let media=$this.m_state.CurrentMedia;
 		let compiled=$this.ListCompiledSources();
-		let prompt=`已安裝執行類型：\n${available||'(none)'}\n可查閱來源：${JSON.stringify(Source.Instances.map((entry)=>entry.Name))}\n${compiled.message}\n目前影像：${JSON.stringify(image)}\n目前媒體類型：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。\n選定比例：${state.SelectedRatio}\n已確認的修改：${JSON.stringify(state.AccumulatedChanges)}\n先前對話：\n${history}\n使用者目前的訊息：\n${message}`;
+		let prompt=`已安裝執行類型：\n${available||'(none)'}\n可查閱來源：${JSON.stringify(Source.Instances.map((entry)=>entry.Name))}\n${compiled}\n目前影像：${JSON.stringify(image)}\n目前媒體類型：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。\n選定比例：${state.SelectedRatio}\n已確認的修改：${JSON.stringify(state.AccumulatedChanges)}\n先前對話：\n${history}\n使用者目前的訊息：\n${message}`;
 		let options={systemInstruction: $this.Instruction()};
 		if (image) {
 			let current=$this.m_state.ActiveMedia;
