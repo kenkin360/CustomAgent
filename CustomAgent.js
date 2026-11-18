@@ -10,89 +10,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 		$this.m_listeners=new Set();
 		$this.m_activeTurn=null;
 		$this.m_ready=null;
-		$this.m_modules=new Modules(new Sources(props.SourceFiles, props.HostSourceUrl));
-		$this.m_executions=[];
 		$this.m_errorEvents=null;
 	}
 	
-	var DisplayText=Function.extend(Promise, function () {
-		var _=this(DisplayText);
-		DisplayText=_[DisplayText];
-
-		function DisplayText(locale) {
-			if ('function'===typeof locale) {
-				_['base'].call(this, locale);
-				return;
-			}
-
-			let resolve;
-			_['base'].call(this, (done)=>{
-				resolve=done;
-			})(function () {
-				this.Locale=locale;
-				this.Entries=DisplayText.Default?.Entries||this.Entries;
-				if ('en'===locale) {
-					resolve(this.Entries);
-					return;
-				}
-
-				Flow.generate.text(`請保持以下字典的所有 key，將每個 value 翻譯為 ${locale} 語系，並只回傳可供 JSON.parse 直接解析的 JSON 物件文字。\n${JSON.stringify(DisplayText.Default.Entries)}`).then((result)=>{
-					this.Entries=JSON.parse(result.text);
-					resolve(this.Entries);
-				}).catch((error)=>{
-					Helper.Error(error);
-					resolve(this.Entries);
-				});
-			});
-		}
-
-		_['public'].Entries={
-			tagline: 'Describe an edit to use local tools, or generate an image'
-			, help: 'Help'
-			, target: 'Target Media'
-			, download: 'Download'
-			, empty: 'No media selected. Load an image or describe an idea in chat.'
-			, media: '＋ Media'
-			, camera: 'Camera'
-			, generating: 'Generating image…'
-			, history: 'Media versions'
-			, copyPrompt: 'Copy prompt'
-			, generate: 'Generate image from confirmed changes'
-			, ratio: 'Output ratio'
-			, original: 'Original'
-			, input: 'Discuss an idea, draw a rectangle, inspect code, or create a local tool…'
-			, send: 'Send'
-			, stop: 'Stop'
-			, about: "Discuss image changes or ask for local operations. Only the Generate button creates a new image. You can also inspect and extend this session's code."
-			, close: 'Close'
-			, confirmedChanges: 'Confirmed changes'
-			, you: 'You'
-			, agent: 'Assistant'
-			, promptDraft: 'Combined prompt draft: '
-			, copy: 'Copy'
-			, thinking: 'Thinking and running local operations…'
-		};
-		
-		_['public'].Locale=null;
-
-		DisplayText.GetInstance=function (locale) {
-			let instance=DisplayText.Instances.find((value)=>value.Locale===locale);
-			if (!instance) {
-				instance=new DisplayText(locale);
-				DisplayText.Instances.push(instance);
-			}
-
-			return instance;
-		};
-
-		DisplayText.GetText=function (locale, key) {
-			return DisplayText.GetInstance(locale).Entries?.[key]??DisplayText.Default.Entries[key]??key;
-		};
-
-		DisplayText.Default=new DisplayText('en');
-		DisplayText.Instances=[DisplayText.Default];
-	});
-
 	_['private'].SetValues=function (patch) {
 		this.m_state.Apply(patch);
 		this.Update();
@@ -184,10 +104,12 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].SelectVersion=function (id) {
 		let $this=_(this);
-		let media=$this.m_state.History.find((item)=>item.Id===id);
-		if (!media) { return Helper.Error('Media version not found: '+id); }
+		let media=$this.m_state.Select(id);
+		if (media instanceof Error) {
+			return media;
+		}
 
-		$this.SetValues({activeMedia: media, currentMedia: media});
+		$this.SetValues({});
 	};
 
 	_['public'].Stop=function () {
@@ -202,23 +124,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 	};
 
 	_['public'].GenerateVideo=async function (args={}, context={}) {
-		let image=context.image;
-		if ((args.useCurrentImageAsFirstFrame||args.useCurrentImageAsReference)&&!image) { return Helper.Error('No current image is available.'); }
-
-		if (args.useCurrentImageAsFirstFrame&&args.firstFrameImageMediaId) { return Helper.Error('Choose one first-frame image.'); }
-
-		let references=args.referenceImageMediaIds||[];
-		if (!Array.isArray(references)) { return Helper.Error('Reference image media IDs must be an array.'); }
-
-		let artifact=await new VideoService().Generate({
-			prompt: args.prompt
-			, aspectRatio: args.aspectRatio
-			, durationSeconds: args.durationSeconds
-			, resolution: args.resolution
-			, firstFrameImage: args.useCurrentImageAsFirstFrame?image:args.firstFrameImageMediaId
-			, referenceImages: args.useCurrentImageAsReference?[image, ...references]:references
-			, sourceVideoMediaId: args.sourceVideoMediaId
-		});
+		let artifact=await new VideoService().Generate(args, context);
 
 		if (artifact instanceof Error) {
 			return artifact;
@@ -229,7 +135,6 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['public'].componentDidMount=function () {
 		let $this=_(this);
-		$this.m_modules.GetRuntime().UI=this;
 		let root=$this.m_view.GetRoot();
 		let input=$this.m_view.Node('input').GetElement();
 		let actions=[
@@ -333,7 +238,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 				return;
 			}
 
-			$this.SetValues({activeMedia: image, currentMedia: image, history: [image, ...$this.m_state.History]});
+			$this.SetValues({media: image});
 			await this.NotifyAssistant('Media selected', {Title: image.Title, Width: image.Width, Height: image.Height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -349,7 +254,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 				return;
 			}
 
-			$this.SetValues({activeMedia: image, currentMedia: image, history: [image, ...$this.m_state.History]});
+			$this.SetValues({media: image});
 			await this.NotifyAssistant('Camera image captured', {Title: image.Title, Width: image.Width, Height: image.Height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -368,7 +273,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			let image=await new ImageService().Generate(text, state.ActiveMedia instanceof Media.Image?state.ActiveMedia:null, state.SelectedRatio, state.History.length+1);
 			if (image instanceof Error) { $this.ReportError(image); return; }
 
-			$this.SetValues({activeMedia: image, currentMedia: image, history: [image, ...state.History]});
+			$this.SetValues({media: image});
 			await this.NotifyAssistant('Image generation completed', {Title: image.Title, Prompt: text, Width: image.Width, Height: image.Height}, image);
 		}
 		catch (error) { await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); }
@@ -398,14 +303,14 @@ var CustomAgent=Function.extend(React.Component, function () {
 			root.oninput=root.onkeydown=null;
 		}
 
-		let runtime=$this.m_modules.GetRuntime();
-		if (runtime.UI===this) {
-			delete runtime.UI;
-		}
+		Executable.DisposeAll($this).then((error)=>{
+			if (error) {
+				console.error(error);
+			}
 
-		for (let name of this.Mounted()) this.Unmount(name);
-		$this.m_view.Dispose();
-		$this.m_listeners.clear();
+			$this.m_view.Dispose();
+			$this.m_listeners.clear();
+		}).catch((error)=>console.error(error));
 	};
 
 	_['public'].render=function () {
@@ -418,7 +323,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 		await DisplayText.GetInstance(locale);
 		$this.Update();
 		$this.m_view.Node('app').SetStyle('visibility', 'visible');
-		let startup=await $this.m_modules.Initialize();
+		let startup=await Executable.Initialize(new Sources(this.props.SourceFiles, this.props.HostSourceUrl), ['DrawRectangle', 'Upscale']);
 		if (startup instanceof Error) {
 			$this.ReportError(startup);
 			return;
@@ -428,7 +333,7 @@ var CustomAgent=Function.extend(React.Component, function () {
 			return;
 		}
 
-		let reply=await $this.InvokeText(`你是否了解自己的能力？請簡短歡迎使用者。瀏覽器語系：${locale}。可用模組：${$this.m_modules.GetNames().join(', ')}。`, {systemInstruction: $this.Instruction()});
+		let reply=await $this.InvokeText(`你是否了解自己的能力？請簡短歡迎使用者。瀏覽器語系：${locale}。可用模組：${Executable.GetNames().join(', ')}。`, {systemInstruction: $this.Instruction()});
 		if (reply instanceof Error) {
 			$this.ReportError(reply);
 		}
@@ -439,54 +344,25 @@ var CustomAgent=Function.extend(React.Component, function () {
 
 	_['private'].Instruction=function () {
 		return `你是 CustomAgent App 內的 Assistant。只回傳 JavaScript async 函式本體，不要 Markdown 程式碼區塊或 JSON 包裝。程式必須依目前使用者對話的語言回傳純字串；若只需回答文字，直接回傳字串。
-函式本體收到 modules 參數，可用成員如下：
-- modules.Runtime：依名稱取得已安裝的類型；直接呼叫並 await 其靜態 Run 方法。
-- modules.Context：實際的 {image, artifact} Media 物件實例；直接檢查類型與成員。
-- await modules.Apply(result)：顯示模組產出的影像或影片，並加入媒體歷史。
-- await modules.Install(name, Type)：安裝在本函式本體中定義的類型。類型可定義靜態 Dispose() 釋放監聽器、計時器等資源；以模組名稱掛載的 UI 會自動移除。若類型的資源在 rollback 後需要重新建立，也應定義靜態 Initialize()，並在首次安裝後呼叫。
-- await modules.Rollback()：撤銷最近一次安裝。await modules.Uninstall(name)：移除模組及其已安裝的原碼。
-- modules.Sources：使用 ReadCompiledSource({file})、ReadRemoteSource({name})、ReadInstalledSource({name}) 讀取原碼。
-- modules.UI：目前的 App。使用 UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) 記錄已確認的修改、ResetConversation() 清除對話，影片請求使用 GenerateVideo(options, modules.Context)。只有使用者按下 Generate 才會開始影像生成。
-- modules.Executions：本次工作階段先前產生的程式及其實際執行結果。
+函式本體收到 Executable、app、context、apply、source 參數，可用成員如下：
+- Executable.GetInstance(name)：取得已安裝的 Executable 實例，直接呼叫並 await 其 Run 方法。
+- context：實際的 {image, artifact} Media 物件實例；直接檢查類型與成員。
+- await apply(result)：顯示執行結果中的影像或影片，並加入媒體歷史。
+- await Executable.Install(name, executableClass, source, app)：安裝在本函式本體中以 Function.extend(Executable, factory) 定義的類型。實例可定義 Dispose() 釋放監聽器、計時器等資源；以名稱掛載的畫面會自動移除。若 rollback 後需要重新建立資源，也應定義 Initialize()。
+- await Executable.Rollback(app)：撤銷最近一次安裝。await Executable.Uninstall(name, app)：移除執行類型及其已安裝的原碼。
+- Executable.Sources：使用 ReadCompiledSource({file})、ReadRemoteSource({name})、ReadInstalledSource({name}) 讀取原碼。
+- app：目前的 CustomAgent 實例。使用 UpdateConversation({accumulatedChanges, generationPrompt, selectedRatio}) 記錄已確認的修改、ResetConversation() 清除對話，影片請求使用 GenerateVideo(options, context)。只有使用者按下 Generate 才會開始影像生成。
+- Executable.Executions：本次工作階段先前產生的程式及其實際執行結果。
 所有非同步工作都要 await，包括透過 Promise.all 並行的工作。檢查 API 回傳的 Error。禁止使用 throw、switch、操作名稱或 JSON 操作計畫。使用 tab 縮排、C# 風格命名、每個 if 都加大括號，運算子左右不留空格。程式碼不使用中文，但要向使用者顯示的文字依對話語言撰寫。修復失敗程式時，不要再次執行已完成的操作。`;
 	};
 
 	_['private'].ApplyResult=async function (result) {
-		if (result instanceof Error) {
-			return result;
+		let applied=await this.m_state.Accept(result);
+		if (!(applied instanceof Error)) {
+			this.SetValues({});
 		}
 
-		let value=result?.artifact||result?.image||result;
-		if (!(value instanceof Media)&&!value?.mimeType&&!value?.MimeType) {
-			return result;
-		}
-
-		if (!(value instanceof Media)&&!value.data&&!value.base64&&value.mediaId) {
-			try {
-				value={...value, ...await Flow.media.getBase64({mediaId: value.mediaId})};
-			}
-			catch (error) {
-				return Helper.Error(error);
-			}
-		}
-
-		let media=Media.From(value);
-		if (media instanceof Error) {
-			return media;
-		}
-
-		if (!media.Data) {
-			return Helper.Error('Media content is unavailable.');
-		}
-
-		if (media instanceof Media.Image||media instanceof Media.Video) {
-			this.SetValues({activeMedia: media, currentMedia: media, history: [media, ...this.m_state.History]});
-		}
-		else {
-			this.SetValues({currentMedia: media});
-		}
-
-		return result;
+		return applied;
 	};
 
 	_['private'].InvokeText=async function (prompt, options, turn) {
@@ -503,57 +379,8 @@ var CustomAgent=Function.extend(React.Component, function () {
 			return null;
 		}
 
-		let code=response?.text;
-		let execution={Code: code, Reply: null, Error: null, Changes: []};
-		$this.m_executions.push(execution);
-		let pending=[];
-		let track=(operation, description)=>{
-			let task=Promise.resolve(operation).then((value)=>{
-				execution.Changes.push({Operation: description, Result: value instanceof Error?value.message:'completed'});
-				return value;
-			}, (error)=>{
-				let failure=Helper.Error(error);
-				execution.Changes.push({Operation: description, Result: failure.message});
-				return failure;
-			});
-
-			pending.push(task);
-			return task;
-		};
-
 		let image=$this.m_state.ActiveMedia instanceof Media.Image?$this.m_state.ActiveMedia:null;
-		let modules={
-			Runtime: $this.m_modules.GetRuntime().Modules
-			, Context: {image, artifact: $this.m_state.CurrentMedia}
-			, Sources: $this.m_modules.GetSources()
-			, Executions: $this.m_executions
-			, UI: $this.m_modules.GetRuntime().UI
-			, Install: (name, Type)=>track($this.m_modules.Install(name, Type, code), `Install ${name}`)
-			, Rollback: ()=>track($this.m_modules.Rollback(), 'Rollback')
-			, Uninstall: (name)=>track($this.m_modules.Uninstall(name), `Uninstall ${name}`)
-			, Apply: (value)=>track($this.ApplyResult(value), 'Apply media')
-		};
-
-		try {
-			let AsyncFunction=(async function () {}).constructor;
-			let Run=new AsyncFunction('modules', code+'\n//# sourceURL=CustomAgentGenerated.js');
-			execution.Reply=await Run(modules);
-		}
-		catch (error) {
-			execution.Error=error instanceof Error?error:Helper.Error(error);
-		}
-
-		let results=await Promise.all(pending);
-		execution.Error||=results.find((value)=>value instanceof Error)||null;
-		if (execution.Reply instanceof Error) {
-			execution.Error||=execution.Reply;
-		}
-
-		if (!execution.Error&&'string'!==typeof execution.Reply) {
-			execution.Error=Helper.Error('Generated code must return a string.');
-		}
-
-		return execution.Error||execution.Reply;
+		return Executable.Execute(response?.text, this, {image, artifact: $this.m_state.CurrentMedia}, (result)=>this.ApplyResult(result));
 	};
 
 	_['private'].HandleMessage=async function (message, turn) {
@@ -568,9 +395,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 		let image=await $this.GetImageInfo();
 		if (image instanceof Error) { $this.ReportError(image); return; }
 
-		let available=Object.entries($this.m_modules.GetRuntime().Modules).map(([name, Type])=>`${name}: ${Type.Run?.Description||'no description'}`).join('\n');
+		let available=Executable.Instances.map((instance)=>`${instance.Name}: ${instance.Description||'no description'}`).join('\n');
 		let media=$this.m_state.CurrentMedia;
-		let prompt=`已安裝模組：\n${available||'(none)'}\n已編譯的原碼檔案：${JSON.stringify($this.m_modules.GetSources().CompiledNames())}\n目前影像：${JSON.stringify(image)}\n目前媒體類型：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 modules.Context.artifact 存取物件實例。\n選定比例：${state.SelectedRatio}\n已確認的修改：${JSON.stringify(state.AccumulatedChanges)}\n先前對話：\n${history}\n使用者目前的訊息：\n${message}`;
+		let prompt=`已安裝執行類型：\n${available||'(none)'}\n已編譯的原碼檔案：${JSON.stringify(Executable.Sources.CompiledNames())}\n目前影像：${JSON.stringify(image)}\n目前媒體類型：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。\n選定比例：${state.SelectedRatio}\n已確認的修改：${JSON.stringify(state.AccumulatedChanges)}\n先前對話：\n${history}\n使用者目前的訊息：\n${message}`;
 		let options={systemInstruction: $this.Instruction()};
 		if (image) {
 			let current=$this.m_state.ActiveMedia;
@@ -588,9 +415,9 @@ var CustomAgent=Function.extend(React.Component, function () {
 				return;
 			}
 
-			let previous=$this.m_executions.at(-1);
+			let previous=Executable.Executions.at(-1);
 			media=$this.m_state.CurrentMedia;
-			prompt+=`\n前一次程式執行失敗，原碼如下：\n${previous?.Code||''}\n實際已完成的操作：${JSON.stringify(previous?.Changes||[])}\n錯誤：${reply.message}\n目前已安裝模組：${$this.m_modules.GetNames().join(', ')}\n目前媒體：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 modules.Context.artifact 存取物件實例。\n請撰寫修正後的程式，依照實際狀態繼續，不要重複已成功的副作用。`;
+			prompt+=`\n前一次程式執行失敗，原碼如下：\n${previous?.Code||''}\n實際已完成的操作：${JSON.stringify(previous?.Changes||[])}\n錯誤：${reply.message}\n目前已安裝執行類型：${Executable.GetNames().join(', ')}\n目前媒體：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。\n請撰寫修正後的程式，依照實際狀態繼續，不要重複已成功的副作用。`;
 			if (attempt===2) {
 				$this.ReportError(reply);
 			}
@@ -625,7 +452,5 @@ App 事件：${event}
 	_['private'].m_activeTurn=null;
 	_['private'].m_ready=null;
 	_['private'].m_view=null;
-	_['private'].m_modules=null;
-	_['private'].m_executions=null;
 	_['private'].m_errorEvents=null;
 });

@@ -27,6 +27,10 @@ var Sources=Function.extend(Object, function () {
 
 	_['public'].GetInstalled=function (name) { return _(this).m_installed.get(name); };
 
+	_['public'].GetRemote=function (name) {
+		return _(this).m_entries.find((entry)=>entry.Name===name||entry.Value.split(/[?#]/)[0].split('/').pop()===name);
+	};
+
 	_['public'].SetInstalled=function (name, entry) {
 		if (entry) {
 			_(this).m_installed.set(name, entry);
@@ -71,7 +75,7 @@ var Sources=Function.extend(Object, function () {
 		let entries=_(this).m_entries;
 		if ('string'!==typeof args.name) { return {message: `Remote source entries: ${JSON.stringify(entries.map((entry)=>({name: entry.Name, url: entry.Value, readyMember: entry.ReadyMember})))}`}; }
 
-		let entry=entries.find((item)=>item.Name===args.name||item.Value.split(/[?#]/)[0].split('/').pop()===args.name);
+		let entry=this.GetRemote(args.name);
 		if (!entry) { return Helper.Error('Remote source not found: '+args.name); }
 
 		let response=await fetch(entry.Value);

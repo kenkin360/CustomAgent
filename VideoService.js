@@ -27,8 +27,18 @@ var VideoService=Function.extend(Object, function () {
 		return image.MediaId;
 	};
 
-	_['public'].Generate=async function (options={}) {
-		let {prompt, firstFrameImage, referenceImages, sourceVideoMediaId, aspectRatio='16:9', durationSeconds=5, resolution='720p'}=options;
+	_['public'].Generate=async function (options={}, context={}) {
+		let image=context.image;
+		if ((options.useCurrentImageAsFirstFrame||options.useCurrentImageAsReference)&&!image) { return Helper.Error('No current image is available.'); }
+
+		if (options.useCurrentImageAsFirstFrame&&options.firstFrameImageMediaId) { return Helper.Error('Choose one first-frame image.'); }
+
+		let references=options.referenceImageMediaIds||options.referenceImages||[];
+		if (!Array.isArray(references)) { return Helper.Error('Reference image media IDs must be an array.'); }
+
+		let {prompt, sourceVideoMediaId, aspectRatio='16:9', durationSeconds=5, resolution='720p'}=options;
+		let firstFrameImage=options.useCurrentImageAsFirstFrame?image:options.firstFrameImageMediaId||options.firstFrameImage;
+		let referenceImages=options.useCurrentImageAsReference?[image, ...references]:references;
 		if ('string'!==typeof prompt||!prompt.trim()) { return Helper.Error('Provide a video prompt.'); }
 
 		if (!['16:9', '9:16'].includes(aspectRatio)) { return Helper.Error('Unsupported video aspect ratio.'); }

@@ -1,11 +1,8 @@
-var AgentState=Function.extend(Object, function () {
+var AgentState=Function.extend(MediaSession, function () {
 	var _=this(AgentState);
 	AgentState=_[AgentState];
 	function AgentState() {
 		_['base'].apply(this, arguments);
-		this.ActiveMedia=null;
-		this.CurrentMedia=null;
-		this.History=[];
 		this.IsGenerating=false;
 		this.SelectedRatio='original';
 		this.AccumulatedChanges=[];
@@ -16,17 +13,7 @@ var AgentState=Function.extend(Object, function () {
 	};
 
 	_['public'].Apply=function (patch) {
-		if ('activeMedia' in patch) {
-			this.ActiveMedia=patch.activeMedia;
-		}
-
-		if ('currentMedia' in patch) {
-			this.CurrentMedia=patch.currentMedia;
-		}
-
-		if ('history' in patch) {
-			this.History=patch.history;
-		}
+		MediaSession.prototype.Update.call(this, patch);
 
 		if ('isGenerating' in patch) { this.IsGenerating=patch.isGenerating; }
 
@@ -45,9 +32,6 @@ var AgentState=Function.extend(Object, function () {
 		if ('isConsulting' in patch) { this.IsConsulting=patch.isConsulting; }
 	};
 
-	_['public'].ActiveMedia=null;
-	_['public'].CurrentMedia=null;
-	_['public'].History=null;
 	_['public'].IsGenerating=null;
 	_['public'].SelectedRatio=null;
 	_['public'].AccumulatedChanges=null;
