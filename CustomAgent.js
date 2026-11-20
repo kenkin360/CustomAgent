@@ -16,16 +16,10 @@ var CustomAgent=Function.extend(React.Component, function () {
 		this.Notify();
 	};
 
-	_['private'].AddMessage=function (sender, text, fields) {
+	_['public'].AddMessage=function (message) {
 		let $this=_(this);
-
-		$this.SetValues({messages: [...$this.m_state.Messages, {
-			Id: `${sender}_${Date.now()}_${Math.random()}`
-			, Sender: sender
-			, Text: text
-			, Timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-			, ...fields
-		}]});
+		$this.SetValues({messages: [...$this.m_state.Messages, message]});
+		return message;
 	};
 
 	_['public'].Slots=['header', 'canvas', 'chat', 'overlay'];
@@ -84,32 +78,6 @@ ${source.Value}
 		return instance.Source.Read();
 	};
 
-	_['public'].GetImageInfo=async function () {
-		let $this=_(this);
-		let image=$this.m_state.ActiveMedia;
-
-		if (!(image instanceof Media.Image)) { 
-			return null; 
-		}
-
-		let dimensions=await new ImageService().GetDimensions(image);
-
-		if (dimensions instanceof Error) { 
-			return dimensions; 
-		}
-
-		return {...dimensions, mimeType: image.MimeType, title: image.Title};
-	};
-
-	_['public'].NotifyAssistant=async function (event, details, image) {
-		try { 
-			await _(this).Report(event, details, image); 
-		}
-		catch (error) { 
-			this.ReportError(error); 
-		}
-	};
-
 	_['public'].Mount=function (name, element, slot='header') { 
 		_(this).m_view.Mount(name, element, slot, this.Slots); 
 	};
@@ -135,7 +103,7 @@ ${source.Value}
 				listener(this.GetState()); 
 			}
 			catch (error) { 
-				console.error('App subscriber failed:', error); 
+				console.error('Agent subscriber failed:', error);
 			}
 		}
 	};
@@ -186,17 +154,24 @@ ${source.Value}
 
 		$this.m_activeTurn.abort();
 		$this.m_activeTurn=null;
-		$this.SetValues({isConsulting: false});
+		let state=$this.m_state;
+		let index=state.Messages.findLastIndex((entry)=>entry instanceof Message.User);
+		$this.SetValues({messages: state.Messages.filter((entry, position)=>position<=index||'string'===typeof entry.Text), isConsulting: false});
 	};
 
-	_['public'].GenerateVideo=async function (args, context) {
-		let artifact=await new VideoService().Generate(args, context);
+	_['public'].GenerateVideo=async function (args) {
+		try {
+			let media=await new VideoService().Generate(args, this.GetState().ActiveMedia);
+			if (media instanceof Error) {
+				return media;
+			}
 
-		if (artifact instanceof Error) {
-			return artifact;
+			this.UpdateConversation({media});
+			return `Video generated and saved to Flow Assets (${media.MediaId}).`;
 		}
-
-		return {message: `Video generated and saved to Flow Assets (${artifact.MediaId}).`, artifact};
+		catch (error) {
+			return Helper.Error(error);
+		}
 	};
 
 	_['public'].componentDidMount=function () {
@@ -217,7 +192,7 @@ ${source.Value}
 					await navigator.clipboard.writeText($this.m_state.GenerationPrompt||'');
 				}
 				catch (error) {
-					$this.ReportError(error);
+					$this.AddMessage(new Message.Error(error));
 				}
 			}]
 		];
@@ -257,7 +232,7 @@ ${source.Value}
 				}
 
 				event.preventDefault();
-				$this.ReportError(error||new Error(event.message||'Generated code failed.'));
+				$this.AddMessage(new Message.Error(error||new Error(event.message||'Generated code failed.')));
 			};
 
 			globalThis.addEventListener('error', (event)=>capture(event, event.error), {signal: $this.m_errorEvents.signal});
@@ -266,7 +241,7 @@ ${source.Value}
 
 		$this.m_ready=$this.Initialize().catch((error)=>{
 			$this.m_view.Node('app').SetStyle('visibility', 'visible');
-			$this.ReportError(error);
+			$this.AddMessage(new Message.Error(error));
 		});
 	};
 	
@@ -280,15 +255,15 @@ ${source.Value}
 
 		let turn=new AbortController();
 		$this.m_activeTurn=turn;
-		$this.AddMessage('user', message);
+		$this.AddMessage(new Message.User(message));
 		$this.SetValues({inputText: '', isConsulting: true});
 
 		try {
-			await $this.HandleMessage(message, turn);
+			await $this.HandleMessage(turn);
 		}
 		catch (error) {
 			if (!turn.signal.aborted) {
-				await this.NotifyAssistant('Conversation failed', {Error: error.message||String(error)});
+				$this.AddMessage(new Message.Error(error));
 			}
 		}
 		finally {
@@ -304,17 +279,20 @@ ${source.Value}
 
 		try {
 			let image=await new ImageService().Select();
-			if (image instanceof Error) { $this.ReportError(image); return; }
+			if (image instanceof Error) {
+				$this.AddMessage(new Message.Error(image));
+				return;
+			}
 
 			if (!image) {
 				return;
 			}
 
 			$this.SetValues({media: image});
-			await this.NotifyAssistant('Media selected', {Title: image.Title, Width: image.Width, Height: image.Height}, image);
+			$this.AddMessage(new Message.Assistant('Media selected: '+image.Title, image));
 		}
 		catch (error) { 
-			await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); 
+			$this.AddMessage(new Message.Error(error));
 		}
 	};
 
@@ -323,17 +301,20 @@ ${source.Value}
 
 		try {
 			let image=await new ImageService().Capture();
-			if (image instanceof Error) { $this.ReportError(image); return; }
+			if (image instanceof Error) {
+				$this.AddMessage(new Message.Error(image));
+				return;
+			}
 
 			if (!image) {
 				return;
 			}
 
 			$this.SetValues({media: image});
-			await this.NotifyAssistant('Camera image captured', {Title: image.Title, Width: image.Width, Height: image.Height}, image);
+			$this.AddMessage(new Message.Assistant('Camera image captured: '+image.Title, image));
 		}
 		catch (error) { 
-			await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); 
+			$this.AddMessage(new Message.Error(error));
 		}
 	};
 
@@ -350,13 +331,16 @@ ${source.Value}
 
 		try {
 			let image=await new ImageService().Generate(text, state.ActiveMedia instanceof Media.Image?state.ActiveMedia:null, state.SelectedRatio, state.History.length+1);
-			if (image instanceof Error) { $this.ReportError(image); return; }
+			if (image instanceof Error) {
+				$this.AddMessage(new Message.Error(image));
+				return;
+			}
 
 			$this.SetValues({media: image});
-			await this.NotifyAssistant('Image generation completed', {Title: image.Title, Prompt: text, Width: image.Width, Height: image.Height}, image);
+			$this.AddMessage(new Message.Assistant('Image generation completed: '+image.Title, image));
 		}
 		catch (error) { 
-			await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); 
+			$this.AddMessage(new Message.Error(error));
 		}
 		finally { 
 			$this.SetValues({isGenerating: false}); 
@@ -377,7 +361,7 @@ ${source.Value}
 			}
 		}
 		catch (error) { 
-			await this.NotifyAssistant('App operation failed', {Error: error.message||String(error)}); 
+			$this.AddMessage(new Message.Error(error));
 		}
 	};
 
@@ -405,7 +389,7 @@ ${source.Value}
 		let error=Source.SetMetaUrl(this.props.HostSourceUrl);
 
 		if (error instanceof Error) {
-			$this.ReportError(error);
+			$this.AddMessage(new Message.Error(error));
 			return;
 		}
 
@@ -425,7 +409,7 @@ ${source.Value}
 			if (!Executable.GetInstance(name)) {
 				let loaded=await Executable.Load(source, this);
 				if (loaded instanceof Error) {
-					$this.ReportError(loaded);
+					$this.AddMessage(new Message.Error(loaded));
 					return;
 				}
 			}
@@ -435,23 +419,30 @@ ${source.Value}
 			return;
 		}
 
-		let reply=await $this.InvokeText(null, $this.MakeSystemInstruction(`
-`));
+		let message=$this.AddMessage(new Message.Assistant());
+		let text;
 
-		if (reply instanceof Error) {
-			$this.ReportError(reply);
+		try {
+			let response=await this.InvokeText('請用使用者的語言簡短介紹你可以協助的事。');
+			text=response instanceof Error?response:await Executable.Execute(response?.text, this);
 		}
-		else if (!$this.m_state.Messages.length) {
-			$this.Reply(reply);
+		catch (failure) {
+			text=Helper.Error(failure);
+		}
+
+		if ($this.m_state.Messages.includes(message)) {
+			message.Text=text;
+			if (text instanceof Error) {
+				$this.m_state.Messages[$this.m_state.Messages.indexOf(message)]=new Message.Error(text);
+			}
+
+			$this.SetValues({messages: [...$this.m_state.Messages]});
 		}
 	};
 
-	_['private'].MakeSystemInstruction=function (x) {
-		return {'systemInstruction': x};
-	};
-
-	_['private'].HandleMessage=async function (message, turn) {
+	_['private'].HandleMessage=async function (turn) {
 		let $this=_(this);
+		let message=$this.AddMessage(new Message.Assistant());
 		await $this.m_ready;
 
 		if (turn.signal.aborted) {
@@ -459,115 +450,90 @@ ${source.Value}
 		}
 
 		let state=$this.GetState();
-		let history=state.Messages.slice(-20).map((entry)=>`${entry.Sender}: ${entry.Text}`).join('\r\n');
-		let image=await $this.GetImageInfo();
-
-		if (image instanceof Error) { 
-			$this.ReportError(image); 
-			return; 
-		}
-
-		let available=Executable.Instances.map((instance)=>`${instance.Name}: ${instance.Description||'no description'}`).join('\r\n');
-		let media=$this.m_state.CurrentMedia;
-		let compiled=$this.ListCompiledSources();
+		let history=state.Messages.slice(-20).filter((entry)=>'string'===typeof entry.Text).map((entry)=>`${entry instanceof Message.User?'User':entry instanceof Message.Error?'Error':'Assistant'}: ${entry.Text}`).join('\r\n');
+		let media=state.CurrentMedia;
 		let previous=null;
+		let failure=null;
 
-		for (let attempt=3; attempt-->0; previous=Executable.Executions.at(-1)) {
-			let options=$this.MakeSystemInstruction(
-(attempt<2)?`
+		for (let attempt=3; attempt-->0;) {
+			let options={systemInstruction: attempt<2?`
 前一次程式執行失敗，原碼如下：
 ${previous?.Code||''}
 實際已完成的操作：${JSON.stringify(previous?.Changes||[])}
-錯誤：${reply.message}
+錯誤：${failure?.message||''}
 目前已安裝執行類型：${Executable.GetNames().join(', ')}
-目前媒體：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。
+請透過 this.GetState() 取得目前訊息與媒體，透過 Executable.GetInstance(name).Run(args) 執行已安裝的類型。
 請依照實際狀態撰寫修正後的程式，接續執行剩餘操作。
 `:`
 已安裝執行類型：
-${available||'(none)'}
+${Executable.Instances.map((instance)=>`${instance.Name}: ${instance.Description||'no description'}`).join('\r\n')||'(none)'}
 可查閱來源：${JSON.stringify(Source.Instances.map((entry)=>entry.Name))}
-${compiled}
-目前影像：${JSON.stringify(image)}
-目前媒體類型：${media?.constructor.name||'none'}；欄位：${media?Object.keys(media).filter(Boolean).join(', '):'(none)'}。透過 context.artifact 存取物件實例。
-選定比例：${state.SelectedRatio}
-已確認的修改：${JSON.stringify(state.AccumulatedChanges)}
+${$this.ListCompiledSources()}
+請透過 this.GetState() 取得目前訊息、媒體、選定比例與已確認的修改；透過 Executable.GetInstance(name).Run(args) 執行已安裝的類型。
+可使用 this.ReadCompiledSource(name)、this.ReadRemoteSource(name) 查閱原始碼。需要載入執行類型時，可使用 Source.GetInstance(name) 取得來源，並呼叫 Executable.Load(source, this) 或 Executable.Install(name, executableClass, source)。
 先前對話：
 ${history}
-使用者目前的訊息：
-${message}
-`);
+`};
 
-			if (image) {
-				let current=$this.m_state.ActiveMedia;
-				options['images']=[{base64: await current.ToBase64(), mimeType: current.MimeType}];
+			try {
+				if (state.ActiveMedia instanceof Media.Image) {
+					let base64=await state.ActiveMedia.ToBase64();
+					if (base64 instanceof Error) {
+						failure=base64;
+						break;
+					}
+
+					options.images=[{base64, mimeType: state.ActiveMedia.MimeType}];
+				}
+
+				let response=await $this.InvokeText(null, options);
+				if (turn.signal.aborted) {
+					return;
+				}
+
+				failure=response instanceof Error?response:await Executable.Execute(response?.text, this);
+				if (!(response instanceof Error)) {
+					previous=Executable.Executions.at(-1);
+				}
 			}
-
-			let reply=await $this.InvokeText(null, options, turn);
+			catch (error) {
+				failure=Helper.Error(error);
+			}
 
 			if (turn.signal.aborted) {
 				return;
 			}
 
-			if (!(reply instanceof Error)) {
-				$this.Reply(reply, {IncludedMedia: $this.m_state.CurrentMedia});
+			if (!(failure instanceof Error)) {
+				message.Text=failure;
+				if (state.CurrentMedia!==media) {
+					message.IncludedMedia=state.CurrentMedia;
+				}
+
+				$this.SetValues({messages: [...state.Messages]});
 				return;
 			}
-
-			$this.ReportError(reply);
-			media=$this.m_state.CurrentMedia;
 		}
+
+		if (turn.signal.aborted) {
+			return;
+		}
+
+		state.Messages[state.Messages.indexOf(message)]=new Message.Error(failure);
+		$this.SetValues({messages: [...state.Messages]});
 	};
 
-	_['public'].InvokeText=async function (prompt, options) {
-		let x=options['systemInstruction'];
-
-		options['systemInstruction']=`
+	_['public'].InvokeText=function (prompt, options) {
+		return Flow.generate.text(prompt??'.', {...options, systemInstruction: `
 請以 Javascript 程式碼回應
 你的回應將會由 Executable.Execute 以 async function 方式執行後將 return value 作為給 user 文字回應
 若要處裡較複雜的需求則應正確設計程式碼以避免在 return 前因錯誤而適用者無法收到答覆
 你也可以利用 this.InvokeText 來使用和自己相同的模型能力
 透過對自己能力的了解最終達成 user 的要求並給予答覆
-`;
 
-		let response=await Flow.generate.text(prompt??'.', options);
-		return Executable.Execute(response?.text, this);
+${options?.systemInstruction||''}
+`}).catch((error)=>Helper.Error(error));
 	};
-
-/*
-	_['private'].ApplyResult=async function (result) {
-		let applied=await this.m_state.Accept(result);
-		if (!(applied instanceof Error)) {
-			this.SetValues({});
-		}
-
-		return applied;
-	};
-
-	_['public'].Reply=function (text, fields) {
-		_(this).AddMessage('agent', text, fields);
-	};
-
-	_['public'].ReportError=function (error) {
-		_(this).AddMessage('system', error.message||String(error));
-	};
-
-	_['private'].Report=async function (event, details, image) {
-		let $this=_(this);
-		await $this.m_ready;
-
-		let messages=this.GetState().Messages.slice(-8).map((entry)=>`${entry.Sender}: ${entry.Text}`).join('\r\n');
-		let reply=await $this.InvokeText(null, $this.MakeSystemInstruction(`
-回報實際結果結果
-`)});
-
-		if (reply instanceof Error) {
-			this.ReportError(reply);
-			return;
-		}
-
-		this.Reply(reply, image?{IncludedMedia: image}:{});
-	};
-*/
 
 	_['private'].m_state=null;
 	_['private'].m_listeners=null;

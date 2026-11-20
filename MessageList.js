@@ -1,29 +1,38 @@
 var MessageList=Function.extend(Object, function () {
 	var _=this(MessageList);
 	MessageList=_[MessageList];
+
 	function MessageList() {
 		_['base'].apply(this, arguments);
 		let $this=_(this);
 		$this.m_lastMessages=null;
 		$this.m_lastNode=null;
-		$this.m_lastConsulting=null;
 	}
 
 	_['public'].Update=function (list, state, text, url) {
 		let $this=_(this);
 		if (!list) { $this.m_lastNode=null; return; }
 
-		if (state.Messages===$this.m_lastMessages&&state.IsConsulting===$this.m_lastConsulting&&list===$this.m_lastNode) { return; }
+		if (state.Messages===$this.m_lastMessages&&list===$this.m_lastNode) { return; }
 
 		let scroll=()=>{
 			list.parentElement.scrollTop=list.parentElement.scrollHeight;
 		};
 
 		let items=state.Messages.map((message)=>{
+			if ('string'!==typeof message.Text) {
+				let thinking=document.createElement('div');
+				thinking.className='ca-thinking';
+				thinking.setAttribute('role', 'status');
+				thinking.setAttribute('aria-live', 'polite');
+				thinking.textContent=text('thinking');
+				return thinking;
+			}
+
 			let item=document.createElement('div');
-			item.className=`ca-message ca-${message.Sender}`;
+			item.className='ca-message '+(message instanceof Message.User?'ca-user':message instanceof Message.Error?'ca-error':'ca-agent');
 			let time=document.createElement('small');
-			time.textContent=('user'===message.Sender?text('you'):'system'===message.Sender?'App':text('agent'))+' · '+message.Timestamp;
+			time.textContent=(message instanceof Message.User?text('you'):text('agent'))+' · '+message.Timestamp;
 			item.appendChild(time);
 			if (message.IncludedMedia instanceof Media.Image||message.IncludedMedia instanceof Media.Video) {
 				let preview=document.createElement(message.IncludedMedia instanceof Media.Video?'video':'img');
@@ -46,38 +55,15 @@ var MessageList=Function.extend(Object, function () {
 			let body=document.createElement('div');
 			body.textContent=message.Text;
 			item.appendChild(body);
-			if (message.SuggestedPrompt) {
-				let prompt=document.createElement('div');
-				prompt.className='ca-prompt';
-				prompt.textContent=text('promptDraft')+message.SuggestedPrompt;
-				item.appendChild(prompt);
-				let copy=document.createElement('button');
-				copy.textContent=text('copy');
-				copy.onclick=()=>navigator.clipboard.writeText(message.SuggestedPrompt);
-				item.appendChild(copy);
-			}
-
 			return item;
 		});
-
-		let pendingIndex=state.IsConsulting?state.Messages.findLastIndex((message)=>'user'===message.Sender):-1;
-		if (pendingIndex>=0) {
-			let thinking=document.createElement('div');
-			thinking.className='ca-thinking';
-			thinking.setAttribute('role', 'status');
-			thinking.setAttribute('aria-live', 'polite');
-			thinking.textContent=text('thinking');
-			items.splice(pendingIndex+1, 0, thinking);
-		}
 
 		list.replaceChildren(...items);
 		$this.m_lastMessages=state.Messages;
 		$this.m_lastNode=list;
-		$this.m_lastConsulting=state.IsConsulting;
 		scroll();
 	};
 
 	_['private'].m_lastMessages=null;
 	_['private'].m_lastNode=null;
-	_['private'].m_lastConsulting=null;
 });

@@ -79,44 +79,6 @@ var AgentSession=Function.extend(Object, function () {
 		return media;
 	};
 
-	_['public'].Accept=async function (result) {
-		if (result instanceof Error) {
-			return result;
-		}
-
-		let value=result?.artifact||result?.image||result;
-		if (!(value instanceof Media)&&!value?.mimeType&&!value?.MimeType) {
-			return result;
-		}
-
-		if (!(value instanceof Media)&&!value.data&&!value.base64&&value.mediaId) {
-			try {
-				value={...value, ...await Flow.media.getBase64({mediaId: value.mediaId})};
-			}
-			catch (error) {
-				return Helper.Error(error);
-			}
-		}
-
-		let media=Media.From(value);
-		if (media instanceof Error) {
-			return media;
-		}
-
-		if (!media.Data) {
-			return Helper.Error('Media content is unavailable.');
-		}
-
-		if (media instanceof Media.Image||media instanceof Media.Video) {
-			this.Add(media);
-		}
-		else {
-			this.CurrentMedia=media;
-		}
-
-		return result;
-	};
-
 	_['public'].ActiveMedia=null;
 	_['public'].CurrentMedia=null;
 	_['public'].History=null;
