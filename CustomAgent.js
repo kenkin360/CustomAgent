@@ -419,7 +419,25 @@ ${source.Value}
 			return;
 		}
 
-		$this.AddMessage(new Message.Assistant(DisplayText.GetText($this.m_view.GetLocale(), 'about')));
+		let message=$this.AddMessage(new Message.Assistant());
+		let text;
+
+		try {
+			let response=await this.InvokeText('請用使用者的語言簡短介紹你可以協助的事。');
+			text=response instanceof Error?response:await Executable.Execute(response?.text, this);
+		}
+		catch (failure) {
+			text=Helper.Error(failure);
+		}
+
+		if ($this.m_state.Messages.includes(message)) {
+			message.Text=text;
+			if (text instanceof Error) {
+				$this.m_state.Messages[$this.m_state.Messages.indexOf(message)]=new Message.Error(text);
+			}
+
+			$this.SetValues({messages: [...$this.m_state.Messages]});
+		}
 	};
 
 	_['private'].HandleMessage=async function (turn) {
@@ -508,10 +526,10 @@ ${history}
 
 	_['public'].InvokeText=function (prompt, options) {
 		return Flow.generate.text(prompt??'.', {...options, systemInstruction: `
-若只需回答文字，請只輸出 JSON 字串字面量，例如 "你好"，不要包物件。
-若需執行操作，請只輸出 JavaScript async function 的內文，最後 return 給使用者的字串。
-不要輸出 Markdown 程式碼區塊、說明或其他包裝文字。
-程式碼將由 Executable.Execute 執行；請 await 非同步操作並處理回傳的 Error。
+一般對話請直接回答純文字，不要包成 JSON 或 JavaScript。
+只有需要執行程式時，才回傳完整的匿名非同步函式：async function () { /* operations */ return 'message'; }
+程式由 Executable.Execute 執行，函式內可透過 this 取得 CustomAgent，並且必須回傳字串。
+請不要使用 Markdown 程式碼區塊；請 await 非同步操作並處理回傳的 Error。
 你也可以利用 this.InvokeText 來使用和自己相同的模型能力
 
 ${options?.systemInstruction||''}
