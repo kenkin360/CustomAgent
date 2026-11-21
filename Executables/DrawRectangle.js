@@ -21,8 +21,8 @@ var DrawRectangle=Function.extend(Executable, function () {
 		return value;
 	};
 
-	_['public'].Run=async function (value, context) {
-		let image=context.image;
+	_['public'].Run=async function (value) {
+		let image=this.Agent.GetState().ActiveMedia;
 		if (!(image instanceof Media.Image)||!image.Data) { return Helper.Error('Load an image before drawing a rectangle.'); }
 
 		let args=_(this).Validate(value);
@@ -55,13 +55,15 @@ var DrawRectangle=Function.extend(Executable, function () {
 		}
 
 		output.strokeRect(args.x*canvas.width, args.y*canvas.height, args.width*canvas.width, args.height*canvas.height);
-		return {message: 'Rectangle drawn on the current image.', image: new Media.Image({
+		let media=new Media.Image({
 			base64: canvas.toDataURL('image/png').split(',')[1]
 			, mimeType: 'image/png'
 			, width: canvas.width
 			, height: canvas.height
 			, title: image.Title+' · Rectangle'
-		})};
+		});
+		this.Agent.UpdateConversation({media});
+		return 'Rectangle drawn on the current image.';
 	};
 
 	_['public'].Description='Draw a rectangle on the current image. Arguments: normalized x, y, width, height (0–1), stroke (#RRGGBB), strokeWidth (pixels), optional fill (#RRGGBB).';

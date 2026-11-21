@@ -116,21 +116,21 @@ var ImageService=Function.extend(Object, function () {
 			image.MediaId=mediaId;
 		}
 
-		let result=await Flow.generate.image({
+		let response=await Flow.generate.image({
 			prompt
 			, referenceImageMediaIds: mediaId?[mediaId]:undefined
 			, aspectRatio
 			, modelDisplayName: ImageService.ModelDisplayName
 		});
 
-		result=await _(this).GetContent(result);
-		if (result instanceof Error) { return result; }
+		response=await _(this).GetContent(response);
+		if (response instanceof Error) { return response; }
 
 		let output=new Media.Image({
 			id: 'ver_'+Date.now()
-			, base64: result.base64
-			, mimeType: result.mimeType
-			, mediaId: result.mediaId
+			, base64: response.base64
+			, mimeType: response.mimeType
+			, mediaId: response.mediaId
 			, title: `Version #${index}`
 		});
 

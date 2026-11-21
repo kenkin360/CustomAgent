@@ -46,6 +46,7 @@ var Bundle=Function.extend(Function, function () {
 		, ['Media', Bundle.CustomAgent('Media.js')]
 		, ['View', Bundle.CustomAgent('View.js')]
 		, ['MessageList', Bundle.CustomAgent('MessageList.js')]
+		, ['Message', Bundle.CustomAgent('Message.js')]
 		, ['HistoryList', Bundle.CustomAgent('HistoryList.js')]
 		, ['Executable', Bundle.CustomAgent('Executable.js')]
 		, ['Source', Bundle.CustomAgent('Source.js')]

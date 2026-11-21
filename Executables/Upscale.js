@@ -33,7 +33,8 @@ var Upscale=Function.extend(Executable, function () {
 		catch (error) { $this.m_weights=null; return Helper.Error(error); }
 	};
 
-	_['public'].Run=async function (args, {image}) {
+	_['public'].Run=async function (args) {
+		let image=this.Agent.GetState().ActiveMedia;
 		if (!(image instanceof Media.Image)||!image.Data) { return Helper.Error('Load an image first.'); }
 
 		let width=args.width;
@@ -103,13 +104,13 @@ var Upscale=Function.extend(Executable, function () {
 
 			if (webgl) {
 				let pixels=upscaler.readPixels();
-				let result=context.createImageData(output.width, output.height);
+				let pixelsData=context.createImageData(output.width, output.height);
 				let row=output.width*4;
 				for (let y=0; y<output.height; y++) {
-					result.data.set(pixels.subarray(y*row, (y+1)*row), (output.height-1-y)*row);
+					pixelsData.data.set(pixels.subarray(y*row, (y+1)*row), (output.height-1-y)*row);
 				}
 
-				context.putImageData(result, 0, 0);
+				context.putImageData(pixelsData, 0, 0);
 			}
 			else context.drawImage(canvas, 0, 0);
 			if (width&&height&&(width!==output.width||height!==output.height)) {
@@ -127,16 +128,15 @@ var Upscale=Function.extend(Executable, function () {
 				output=fitted;
 			}
 
-			return {
-				message: 'Upscaled to '+output.width+' × '+output.height+' with Real-ESRGAN.'
-				, image: new Media.Image({
+			let media=new Media.Image({
 					base64: output.toDataURL('image/png').split(',')[1]
 					, mimeType: 'image/png'
 					, width: output.width
 					, height: output.height
 					, title: image.Title+' · '+output.width+'×'+output.height
-				})
-			};
+				});
+			this.Agent.UpdateConversation({media});
+			return 'Upscaled to '+output.width+' × '+output.height+' with Real-ESRGAN.';
 		}
 		finally { upscaler.destroy(); }
 	};

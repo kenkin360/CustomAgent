@@ -2,14 +2,20 @@ var Executable=Function.extend(Object, function () {
 	var _=this(Executable);
 	Executable=_[Executable];
 
-	function Executable(name, source) {
+	function Executable(name, source, agent) {
 		_['base'].apply(this, arguments);
 		this.Name=name;
 		this.Source=source;
+		this.Agent=agent;
+		let run=this.Run;
+		this.Run=function (...args) {
+			return Track(Promise.resolve().then(()=>run.apply(this, args)), `Run ${this.Name}`);
+		};
 	}
 
 	_['public'].Name=null;
 	_['public'].Source=null;
+	_['public'].Agent=null;
 
 	_['public'].Run=async function () {
 		return Helper.Error('This executable has no Run method.');
@@ -25,12 +31,12 @@ var Executable=Function.extend(Object, function () {
 
 	function Track(operation, description) {
 		let execution=Executable.CurrentExecution;
-		let task=Promise.resolve(operation).then((result)=>{
-			execution?.Changes.push({Operation: description, Result: result instanceof Error?result.message:'completed'});
-			return result;
+		let task=Promise.resolve(operation).then((value)=>{
+			execution?.Changes.push({Operation: description, Value: value instanceof Error?value.message:'completed'});
+			return value;
 		}, (error)=>{
 			let failure=Helper.Error(error);
-			execution?.Changes.push({Operation: description, Result: failure.message});
+			execution?.Changes.push({Operation: description, Value: failure.message});
 			return failure;
 		});
 
@@ -46,21 +52,23 @@ var Executable=Function.extend(Object, function () {
 		return Executable.Instances.map((instance)=>instance.Name);
 	};
 
-	Executable.Load=async function (source, app) {
-		if (!(source instanceof Source)||!source.Remote) {
-			return Helper.Error('Provide a remote executable source.');
-		}
+	Executable.Load=function (source, agent) {
+		return Track((async ()=>{
+			if (!(source instanceof Source)||!source.Remote) {
+				return Helper.Error('Provide a remote executable source.');
+			}
 
-		try {
-			let executableClass=await new Resource.Module(source.Name, source.Value, source.ReadyMember);
-			return await Executable.Install(source.Name, executableClass, source, app);
-		}
-		catch (error) {
-			return Helper.Error(error);
-		}
+			try {
+				let executableClass=await new Resource.Module(source.Name, source.Value, source.ReadyMember);
+				return await Executable.Install(source.Name, executableClass, source, agent);
+			}
+			catch (error) {
+				return Helper.Error(error);
+			}
+		})(), `Load ${source?.Name||'executable'}`);
 	};
 
-	Executable.Remove=async function (instance, app) {
+	Executable.Remove=async function (instance) {
 		let error=null;
 		try {
 			error=await instance.Dispose();
@@ -70,7 +78,7 @@ var Executable=Function.extend(Object, function () {
 		}
 
 		try {
-			app.Unmount(instance.Name);
+			instance.Agent.Unmount(instance.Name);
 		}
 		catch (failure) {
 			error||=Helper.Error(failure);
@@ -79,7 +87,7 @@ var Executable=Function.extend(Object, function () {
 		return error instanceof Error?error:null;
 	};
 
-	Executable.Install=function (name, executableClass, source, app) {
+	Executable.Install=function (name, executableClass, source, agent) {
 		return Track((async ()=>{
 			if ('string'!==typeof name||!/^[A-Za-z_$][\w$]*$/.test(name)) {
 				return Helper.Error('Provide a valid executable name.');
@@ -91,7 +99,7 @@ var Executable=Function.extend(Object, function () {
 
 			let instance;
 			try {
-				instance=new executableClass(name, source instanceof Source?source:new Source(name, source, undefined, false));
+				instance=new executableClass(name, source instanceof Source?source:new Source(name, source, undefined, false), agent||Executable.CurrentExecution?.Agent);
 			}
 			catch (error) {
 				return Helper.Error(error);
@@ -103,7 +111,7 @@ var Executable=Function.extend(Object, function () {
 
 			let previous=Executable.GetInstance(name);
 			if (previous) {
-				let error=await Executable.Remove(previous, app);
+				let error=await Executable.Remove(previous);
 				if (error) {
 					return error;
 				}
@@ -114,9 +122,9 @@ var Executable=Function.extend(Object, function () {
 			Executable.Instances.push(instance);
 			let failure=null;
 			try {
-				let result=await instance.Initialize();
-				if (result instanceof Error) {
-					failure=result;
+				let value=await instance.Initialize();
+				if (value instanceof Error) {
+					failure=value;
 				}
 			}
 			catch (error) {
@@ -124,7 +132,7 @@ var Executable=Function.extend(Object, function () {
 			}
 
 			if (failure) {
-				await Executable.Remove(instance, app);
+				await Executable.Remove(instance);
 				Executable.Instances.splice(Executable.Instances.indexOf(instance), 1);
 				if (previous) {
 					Executable.Instances.push(previous);
@@ -147,14 +155,14 @@ var Executable=Function.extend(Object, function () {
 		})(), `Install ${name}`);
 	};
 
-	Executable.Rollback=function (app) {
+	Executable.Rollback=function () {
 		return Track((async ()=>{
 			let installation=Executable.Versions.at(-1);
 			if (!installation) {
 				return Helper.Error('No executable installation is available to undo.');
 			}
 
-			let error=await Executable.Remove(installation.Current, app);
+			let error=await Executable.Remove(installation.Current);
 			if (error) {
 				return error;
 			}
@@ -167,9 +175,9 @@ var Executable=Function.extend(Object, function () {
 			Executable.Versions.pop();
 			if (installation.Previous) {
 				try {
-					let result=await installation.Previous.Initialize();
-					if (result instanceof Error) {
-						return result;
+					let value=await installation.Previous.Initialize();
+					if (value instanceof Error) {
+						return value;
 					}
 				}
 				catch (failure) {
@@ -181,14 +189,14 @@ var Executable=Function.extend(Object, function () {
 		})(), 'Rollback');
 	};
 
-	Executable.Uninstall=function (name, app) {
+	Executable.Uninstall=function (name) {
 		return Track((async ()=>{
 			let instance=Executable.GetInstance(name);
 			if (!instance) {
 				return Helper.Error('Executable is not installed: '+name);
 			}
 
-			let error=await Executable.Remove(instance, app);
+			let error=await Executable.Remove(instance);
 			if (error) {
 				return error;
 			}
@@ -199,38 +207,38 @@ var Executable=Function.extend(Object, function () {
 		})(), `Uninstall ${name}`);
 	};
 
-	Executable.Execute=async function (code, app, context, apply) {
-		let execution={Code: code, Reply: null, Error: null, Changes: [], Pending: []};
+	Executable.Execute=async function (code, agent) {
+		let execution={Code: code, Text: null, Error: null, Changes: [], Pending: [], Agent: agent};
+		let previous=Executable.CurrentExecution;
 		Executable.Executions.push(execution);
 		Executable.CurrentExecution=execution;
 		try {
 			let AsyncFunction=(async function () {}).constructor;
-			let Run=new AsyncFunction('Executable', 'app', 'context', 'run', 'apply', 'source', code+'\n//# sourceURL=CustomAgentGenerated.js');
-			execution.Reply=await Run(Executable, app, context, (name, args)=>Track((async ()=>{
-				let instance=Executable.GetInstance(name);
-				if (!instance) {
-					return Helper.Error('Executable is not installed: '+name);
-				}
-
-				return instance.Run(args, context);
-			})(), `Run ${name}`), (result)=>Track(apply(result), 'Apply media'), code);
+			let Run=new AsyncFunction('Executable', code+'\n//# sourceURL=CustomAgentGenerated.js');
+			execution.Text=await Run.call(agent, Executable);
 		}
 		catch (error) {
 			execution.Error=error instanceof Error?error:Helper.Error(error);
 		}
 
-		let results=await Promise.all(execution.Pending);
-		Executable.CurrentExecution=null;
-		execution.Error||=results.find((result)=>result instanceof Error)||null;
-		if (execution.Reply instanceof Error) {
-			execution.Error||=execution.Reply;
+		let index=0;
+		while (index<execution.Pending.length) {
+			let pending=execution.Pending.slice(index);
+			index=execution.Pending.length;
+			let values=await Promise.all(pending);
+			execution.Error||=values.find((value)=>value instanceof Error)||null;
 		}
 
-		if (!execution.Error&&'string'!==typeof execution.Reply) {
+		Executable.CurrentExecution=previous;
+		if (execution.Text instanceof Error) {
+			execution.Error||=execution.Text;
+		}
+
+		if (!execution.Error&&'string'!==typeof execution.Text) {
 			execution.Error=Helper.Error('Generated code must return a string.');
 		}
 
-		return execution.Error||execution.Reply;
+		return execution.Error||execution.Text;
 	};
 
 	Executable.Instances=[];

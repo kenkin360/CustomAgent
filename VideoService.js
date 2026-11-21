@@ -27,8 +27,7 @@ var VideoService=Function.extend(Object, function () {
 		return image.MediaId;
 	};
 
-	_['public'].Generate=async function (options, context) {
-		let image=context?.image;
+	_['public'].Generate=async function (options, image) {
 		if ((options.useCurrentImageAsFirstFrame||options.useCurrentImageAsReference)&&!image) { return Helper.Error('No current image is available.'); }
 
 		if (options.useCurrentImageAsFirstFrame&&options.firstFrameImageMediaId) { return Helper.Error('Choose one first-frame image.'); }
@@ -62,7 +61,7 @@ var VideoService=Function.extend(Object, function () {
 		let referenceError=referenceImageMediaIds?.find((value)=>value instanceof Error);
 		if (referenceError) { return referenceError; }
 
-		let result=await Flow.generate.video({
+		let response=await Flow.generate.video({
 			prompt: prompt.trim()
 			, modelDisplayName: VideoService.ModelDisplayName
 			, aspectRatio
@@ -73,17 +72,17 @@ var VideoService=Function.extend(Object, function () {
 			, ...(sourceVideoMediaId?{sourceVideoMediaId}:{})
 		});
 
-		if ('string'!==typeof result?.mediaId||!result.mediaId) { return Helper.Error('Flow did not return a saved video mediaId.'); }
+		if ('string'!==typeof response?.mediaId||!response.mediaId) { return Helper.Error('Flow did not return a saved video mediaId.'); }
 
-		let content='string'===typeof result.base64?result:await Flow.media.getBase64({mediaId: result.mediaId});
+		let content='string'===typeof response.base64?response:await Flow.media.getBase64({mediaId: response.mediaId});
 		if ('string'!==typeof content?.base64||!content.base64) { return Helper.Error('Flow did not return the generated video content.'); }
 
 		return new Media.Video({
 			id: `video_${Date.now()}_${Math.random().toString(36).slice(2)}`
-			, mediaId: result.mediaId
-			, mimeType: content.mimeType||result.mimeType
+			, mediaId: response.mediaId
+			, mimeType: content.mimeType||response.mimeType
 			, base64: content.base64
-			, title: result.name||'Generated video'
+			, title: response.name||'Generated video'
 			, durationSeconds
 			, resolution
 		});
