@@ -213,9 +213,18 @@ var Executable=Function.extend(Object, function () {
 		Executable.Executions.push(execution);
 		Executable.CurrentExecution=execution;
 		try {
-			let AsyncFunction=(async function () {}).constructor;
-			let Run=new AsyncFunction('Executable', code+'\n//# sourceURL=CustomAgentGenerated.js');
-			execution.Text=await Run.call(agent, Executable);
+			if ('string'!==typeof code) {
+				execution.Error=Helper.Error('Generated response must be a string.');
+			}
+			else {
+				if (/^async function\s*\(/.test(code.trim())) {
+					let Run=new Function('Executable', 'return ('+code+');\n//# sourceURL=CustomAgentGenerated.js')(Executable);
+					execution.Text=await Run.call(agent);
+				}
+				else {
+					execution.Text=code;
+				}
+			}
 		}
 		catch (error) {
 			execution.Error=error instanceof Error?error:Helper.Error(error);

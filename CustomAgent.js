@@ -450,7 +450,8 @@ ${source.Value}
 		}
 
 		let state=$this.GetState();
-		let history=state.Messages.slice(-20).filter((entry)=>'string'===typeof entry.Text).map((entry)=>`${entry instanceof Message.User?'User':entry instanceof Message.Error?'Error':'Assistant'}: ${entry.Text}`).join('\r\n');
+		let current=state.Messages.findLast((entry)=>entry instanceof Message.User);
+		let history=state.Messages.slice(-20).filter((entry)=>entry!==current&&'string'===typeof entry.Text).map((entry)=>`${entry instanceof Message.User?'User':entry instanceof Message.Error?'Error':'Assistant'}: ${entry.Text}`).join('\r\n');
 		let media=state.CurrentMedia;
 		let previous=null;
 		let failure=null;
@@ -486,7 +487,7 @@ ${history}
 					options.images=[{base64, mimeType: state.ActiveMedia.MimeType}];
 				}
 
-				let response=await $this.InvokeText(null, options);
+				let response=await $this.InvokeText(current.Text, options);
 				if (turn.signal.aborted) {
 					return;
 				}
@@ -525,11 +526,11 @@ ${history}
 
 	_['public'].InvokeText=function (prompt, options) {
 		return Flow.generate.text(prompt??'.', {...options, systemInstruction: `
-請以 Javascript 程式碼回應
-你的回應將會由 Executable.Execute 以 async function 方式執行後將 return value 作為給 user 文字回應
-若要處裡較複雜的需求則應正確設計程式碼以避免在 return 前因錯誤而適用者無法收到答覆
+一般對話請直接回答純文字，不要包成 JSON 或 JavaScript。
+只有需要執行程式時，才回傳完整的匿名非同步函式：async function () { /* operations */ return 'message'; }
+程式由 Executable.Execute 執行，函式內可透過 this 取得 CustomAgent，並且必須回傳字串。
+請不要使用 Markdown 程式碼區塊；請 await 非同步操作並處理回傳的 Error。
 你也可以利用 this.InvokeText 來使用和自己相同的模型能力
-透過對自己能力的了解最終達成 user 的要求並給予答覆
 
 ${options?.systemInstruction||''}
 `}).catch((error)=>Helper.Error(error));
